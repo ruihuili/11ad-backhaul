@@ -1,0 +1,72 @@
+The next hop of 1 is 0 address192.168.1.1
+The next hop of 2 is 1 address192.168.1.2
+SetupDmgController
+Enforcing Associations
+EnforceAssociations(); Done
+Assigning Equal AirTime
+Time fraction allocated for each node of clique 0 is 0.5
+AssignEqualAirTime(); Done
+Configuring Beacon Intervals
+ConfigureBeaconIntervals(); Done
+Configuring Wifi Manager
+snr 7671.63
+Mesh node 1 to node 0: rx power -44.7637 dBi; VHTMCS24a
+snr 7671.63
+Mesh node 2 to node 1: rx power -44.7637 dBi; VHTMCS24a
+ConfigureWifiManager(); Done
+SetupDmgController Done
+SetupUdpApplicationsUploadTest
+Client 0 is node: 2
+SetupUdpApplicationsUploadTest Done
+
+Simulating 3 mesh stations.
+Traffic sink is on Node 0. Flows sources are: 2 
+*********************************
+NODES POSITIONS (x, y)
+*********************************
+Nodes randomly placed in a square 20x20 (m)
+Mesh0 (17.25, 17.25)
+Mesh1 (17.25, 8.5)
+Mesh2 (8.5, 8.5)
+
+*********************************
+SIMULATION CONFIGURATION
+*********************************
+Simulation time in seconds: 10
+11ad mode: OFDM
+UDP payload 1470 bytes
+Application level data rate: 1000Mbps
+PCAP capture enabled: true
+Min Frame BER: 0
+Transmission power: 10dBi
+Transmission and Reception gain: 1dBi
+TX and RX antenna gain: 15dBi
+Antenna beamwidth degrees: 40.9731
+BI duration: 102400000ns
+BI overhead: 10240000ns
+Max number of packets stored in Mac queue: 5000
+Topology read from file: scratch/2hop.txt
+
+*********************************
+IDEAL RX POWER and MCS
+*********************************
+Mesh node 0 to node 1: rx power -44.7637dBi; VHTMCS24a
+and Mesh node 1 to node 0: rx power -44.7637dBi; VHTMCS24a
+Mesh node 1 to node 0: rx power -44.7637dBi; VHTMCS24a
+and Mesh node 0 to node 1: rx power -44.7637dBi; VHTMCS24a
+Mesh node 1 to node 2: rx power -44.7637dBi; VHTMCS24a
+and Mesh node 2 to node 1: rx power -44.7637dBi; VHTMCS24a
+Mesh node 2 to node 1: rx power -44.7637dBi; VHTMCS24a
+and Mesh node 1 to node 2: rx power -44.7637dBi; VHTMCS24a
+
+*********************************
+SERVICE PERIODS
+*********************************
+STA 0 SP duration: +46080000.0ns (start at +10240000.0ns, end at +56320000.0ns) MACadd: 00:00:00:00:00:01 to 00:00:00:00:00:02
+STA 1 SP duration: +46080000.0ns (start at +10240000.0ns, end at +56320000.0ns) MACadd: 00:00:00:00:00:02 to 00:00:00:00:00:01
+STA 1 SP duration: +46080000.0ns (start at +56320000.0ns, end at +102400000.0ns) MACadd: 00:00:00:00:00:02 to 00:00:00:00:00:03
+STA 2 SP duration: +46080000.0ns (start at +56320000.0ns, end at +102400000.0ns) MACadd: 00:00:00:00:00:03 to 00:00:00:00:00:02
+
+Finalize Config
+FinalizeConfig Done
+PrintProgress
