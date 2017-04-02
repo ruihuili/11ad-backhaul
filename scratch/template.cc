@@ -759,7 +759,7 @@ void ReconfigureDmgBeaconInterval (struct sim_config *config, uint16_t it)
 		config->dmgCtrl->EnforceAdditionalSignalLossBetween(config->meshNodes->Get(0), config->meshNodes->Get(3), 5 * it);
 	}
 
-	config->predictedFlowRate = config->dmgCtrl->FlowRateProgressiveFilling(config->flowsDmd, config->proFillStepL, config->appPayloadBytes, config->biOverheadFraction);
+	config->predictedFlowRate = config->dmgCtrl->FlowRateProgressiveFilling(config->flowsDmd, config->proFillStepL, config->appPayloadBytes, config->biOverheadFraction, config->nMpdus);
 
 	config->dmgCtrl->ConfigureSchedule();
 
@@ -813,7 +813,7 @@ void SetupDmgController (struct sim_config *config)
 
 	config->dmgCtrl->SetAckTimeFrac(config->ackTraffFrac);
 
-	config->predictedFlowRate = config->dmgCtrl->FlowRateProgressiveFilling(config->flowsDmd, config->proFillStepL, config->appPayloadBytes, config->biOverheadFraction);
+	config->predictedFlowRate = config->dmgCtrl->FlowRateProgressiveFilling(config->flowsDmd, config->proFillStepL, config->appPayloadBytes, config->biOverheadFraction, config->nMpdus);
 
 	config->predictedFlowRate = config->dmgCtrl->FlowRateMaxDlmac(config->appPayloadBytes, config->biOverheadFraction);
 	/* Let the DmgAlmightyController know the Beacon Interval duration */
@@ -877,6 +877,10 @@ void SetupDmgNodes (struct sim_config *config)
 			GetMac()->GetObject<DmgWifiMac>()->SetPropagationGuard(
 					Seconds(sqrt(pow(config->square_side_l, 2) * 2) /
 						3e8));
+
+		/* Configure number of mpdus to aggregated (used to measure return duration) */
+		allNodes.Get(i)->GetDevice(0)->GetObject<WifiNetDevice>()->
+			GetMac()->GetObject<DmgWifiMac>()->SetMaxNumMpdu(config->nMpdus);
 
 		/* Configure phy level parameters */
 		Ptr<YansWifiPhy> yPhy =
@@ -1176,10 +1180,10 @@ int main (int argc, char *argv[])
 		//overwrite the user input of 'inputFileName'
 		//from 'scratch/xxx' to 'topo2/topo2.txt'
 		std::ostringstream input_oss;
-		input_oss << "topo" << topology << "/topo" << topology << ".txt";
+		input_oss << "topo" << topology << "/topo" << topology  << ".txt";
 		NS_LOG_INFO("input path: " << input_oss.str()); 
 		config.inputFileName = input_oss.str();
-		config.dir_oss << "topo"<< topology << "/scenario"  << config.scenario << "/";
+		config.dir_oss << "topo"<< topology << "/scenario"  << config.scenario << "/mpdu"<< config.nMpdus << "/";
 		NS_LOG_INFO("output path: " << config.dir_oss.str());
 	}
 
@@ -1422,8 +1426,10 @@ int main (int argc, char *argv[])
 		Simulator::Schedule(NanoSeconds(config.biDurationNs * 10), StartDmdRateMeasurement, &config);
 		Simulator::Schedule(NanoSeconds(config.biDurationNs * 11), GetDmdRateMeasurement, &config);
 	}
-	else if (config.scenario > 0 && config.scenario < 10)
+	else if (config.scenario > 0 && config.scenario <= 10)
 		Simulator::Schedule(NanoSeconds(config.biDurationNs * 13 + 1), ReconfigureDmgBeaconInterval, &config, 1);
+	else if (config.scenario > 10 && config.scenario <= 20)
+		Simulator::Schedule(NanoSeconds(config.biDurationNs * 11 + 1), ReconfigureDmgBeaconInterval, &config, 1);
 
 	FlowMonitorHelper flowmon;
 	Ptr<FlowMonitor> monitor =flowmon.InstallAll ();

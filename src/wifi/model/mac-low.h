@@ -844,6 +844,9 @@ public:
   /* Return the measured duration of a complete MPDU transmission*/
   Time GetNMpduReturnDuration (Mac48Address mac);
 
+  /* Set max num of Mpdu*/
+  void SetMaxNumMpdu(uint32_t num);
+
 protected:
   /**
    * Return a TXVECTOR for the DATA frame given the destination.
@@ -1378,6 +1381,8 @@ private:
   bool m_isDmg;
   Time m_propagationGuard;
   Time m_dmgAckTimeoutGuard;
+
+  uint32_t m_maxNumMpdu;
 };
 
 } // namespace ns3

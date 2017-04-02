@@ -282,7 +282,7 @@ public:
 
   Time GetNMpduReturnDuration (Mac48Address mac);
 
-
+   void SetMaxNumMpdu (uint32_t n);
 protected:
   virtual void DoInitialize ();
   virtual void DoDispose ();

@@ -457,6 +457,10 @@ DmgAlmightyController::ConfigureHierarchy (void)
 	std::vector <uint32_t> conflictNodes;
 	std::vector <uint32_t> schedulingOrder;
 
+
+        m_master.clear();
+        m_masterClique.clear();
+
 	for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++) 
 	{
 		uint32_t cfl = cliqueS[cIdx].staMem.back();
@@ -624,7 +628,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 
 		//Slicing and buffering on STAs
 		for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flowSegs.size(); segIdx++) {
-			//NS_LOG_INFO("Flow "<< cliqueS[cIdx].flows[segIdx] << " segment between "<<cliqueS[cIdx].flowSegs[segIdx][0] <<" and "<< cliqueS[cIdx].flowSegs[segIdx][1]);
+			NS_LOG_INFO("Flow "<< cliqueS[cIdx].flows[segIdx] << " segment between "<<cliqueS[cIdx].flowSegs[segIdx][0] <<" and "<< cliqueS[cIdx].flowSegs[segIdx][1]);
 
 			uint64_t segSpDurationNs = (uint64_t) floor (scheduleAvailableTimeNs * cliqueS[cIdx].timeAlloc[segIdx]);
 			bool segAllocated = 0;
@@ -633,7 +637,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 
 				cliqueS[cIdx].bufStart[segIdx].push_back(nextSpStartNs);
 				cliqueS[cIdx].bufDurNs[segIdx].push_back(segSpDurationNs);// buffer sp on sta
-				//NS_LOG_INFO(" buffering time between "<< cliqueS[cIdx].bufStart[segIdx].back() <<" and "<< cliqueS[cIdx].bufStart[segIdx].back() + cliqueS[cIdx].bufDurNs[segIdx].back());
+				NS_LOG_INFO(" buffering time between "<< cliqueS[cIdx].bufStart[segIdx].back() <<" and "<< cliqueS[cIdx].bufStart[segIdx].back() + cliqueS[cIdx].bufDurNs[segIdx].back());
 				nextSpStartNs += segSpDurationNs;
 			}
 			else{
@@ -735,7 +739,7 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 
 	//Install the schedule multiple times
 	for (uint32_t scheIdx=0; scheIdx < m_numSchedulePerBi; scheIdx++){
-                if(scheIdx ==0)
+                //if(scheIdx ==0)
 		NS_LOG_INFO("<<<<<<<<<< Example schedule >>> Starts at "<< scheduleStartNs <<" Ends at "<< scheduleStartNs + scheduleDurNs<<" >>>>>>>>>>>>>>>>>>>>>>");
 		for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++){
 			uint32_t conflictNode = conflictNodes.at(cIdx);
@@ -804,12 +808,12 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 					}
 				}
 				else if (std::find(conflictNodes.begin(), conflictNodes.end(), staIdx) != conflictNodes.end()){
-                                        if(scheIdx ==0)
+                                        //if(scheIdx ==0)
 					NS_LOG_INFO("STA" << staIdx << " is Cfl of other clique (skipping)");
 					continue;
 				}
 				else{
-                                        if(scheIdx ==0)
+                                        //if(scheIdx ==0)
 					//the sta is not cfl
 					NS_LOG_INFO("STA " << staIdx << " isn't a Cfl");
 
@@ -818,7 +822,7 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 					std::vector <uint64_t> refStartTime;
 					for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flowSegs.size(); segIdx++){
 						if ((cliqueS[cIdx].flowSegs[segIdx][0] == staIdx)||(cliqueS[cIdx].flowSegs[segIdx][1] == staIdx)){
-							//NS_LOG_INFO("STA " << staIdx << "is in seg "<< segIdx );
+							NS_LOG_INFO("STA " << staIdx << "is in seg "<< segIdx );
 							for (uint32_t bIdx = 0; bIdx < cliqueS[cIdx].bufStart[segIdx].size(); bIdx++){
 								//NS_LOG_INFO("   the " << bIdx << " buffer is noted." );
 								segIdOrder.push_back(segIdx);
@@ -830,7 +834,7 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 					//NS_LOG_INFO(" refStartTime.size() "<< refStartTime.size());
 					//exit(-1);
 					for (uint32_t segIdx = 0; segIdx < refStartTime.size() - 1; segIdx++){
-						//NS_LOG_INFO(" sorting in seg "<< segIdx);
+						NS_LOG_INFO(" sorting in seg "<< segIdx);
 						for (uint32_t sortingIdx = segIdx + 1; sortingIdx < refStartTime.size(); sortingIdx++) {
 							if (refStartTime[segIdx] > refStartTime[sortingIdx]) {
 								std::swap(segIdOrder.at(sortingIdx), segIdOrder.at(segIdx));
@@ -1193,31 +1197,43 @@ double DmgAlmightyController::GetActualTxDurationNs(WifiMode mode)
 }
 
 	void
-DmgAlmightyController::ConfigurePhyRate(uint32_t appPayloadBytes, double biOverheadFraction)
+DmgAlmightyController::ConfigurePhyRate(uint32_t appPayloadBytes, double biOverheadFraction, uint32_t nMpdus)
 {
 	NS_LOG_FUNCTION(this);
 	for (uint32_t cIdx = 0; cIdx< cliqueS.size(); cIdx++){
 		for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flows.size(); segIdx++){
-			uint32_t neiIdx = cliqueS[cIdx].flowSegs[segIdx][0];
-			uint32_t staIdx = cliqueS[cIdx].flowSegs[segIdx][1];
+			uint32_t neiIdx = cliqueS[cIdx].flowSegs[segIdx][1];
+			uint32_t staIdx = cliqueS[cIdx].flowSegs[segIdx][0];
 			Mac48Address neiMacAddr = m_meshNodes->Get(neiIdx)->GetDevice(0)->GetObject<WifiNetDevice>()->GetMac()->GetObject<DmgWifiMac>()->GetAddress();
 			WifiMode sta2NeiWifiMode = m_meshNodes->Get(staIdx)->GetDevice(0)->GetObject<WifiNetDevice>()->GetMac()->GetObject<DmgWifiMac>()-> GetWifiRemoteStationManager()->GetObject<DmgDestinationFixedWifiManager>()->GetDestinationWifiMode(neiMacAddr);
 
 			//num of MPDUs = 30; hard coded tx duration in GetActualTxDurationNs();
 			//equivalent phy rate as seen from mac
-			cliqueS[cIdx].phyRate[segIdx] = double(30 * (appPayloadBytes + 36) * 8 )/GetActualTxDurationNs(sta2NeiWifiMode)*1e3 *(1.0 - biOverheadFraction);//sta2NeiWifiMode.GetDataRate()/1e6;
+			//cliqueS[cIdx].phyRate[segIdx] = sta2NeiWifiMode.GetDataRate()/1e6;
+                        Time duration = m_meshNodes->Get(staIdx)->GetDevice(0)->GetObject<WifiNetDevice>()->GetMac()->GetObject<DmgWifiMac>()->GetNMpduReturnDuration(neiMacAddr);
 
-			NS_LOG_INFO("Equiv phy rate between "<< cliqueS[cIdx].flowSegs[segIdx][0] << " and " << cliqueS[cIdx].flowSegs[segIdx][1]<< " is " << cliqueS[cIdx].phyRate[segIdx] << "Mb/s. wifi mode" << sta2NeiWifiMode.GetUniqueName());
+                        if(duration.GetNanoSeconds())
+                        {
+                                cliqueS[cIdx].phyRate[segIdx] = double(nMpdus * (appPayloadBytes + 36) * 8 )/ duration.GetNanoSeconds() *1e3 *(1.0 - biOverheadFraction);
+                                NS_LOG_INFO("Using measured phy rate");
+                        }
+                        else
+                        {
+                                NS_LOG_INFO("Using hard coded phy rate");
+                                cliqueS[cIdx].phyRate[segIdx] = double(30 * (appPayloadBytes + 36) * 8 )/GetActualTxDurationNs(sta2NeiWifiMode)*1e3 *(1.0 - biOverheadFraction);//sta2NeiWifiMode.GetDataRate()/1e6;
+                        }
+
+			NS_LOG_INFO("Equiv phy rate between "<< staIdx << " and " << neiIdx << " is " << cliqueS[cIdx].phyRate[segIdx] << "Mb/s. wifi mode" << sta2NeiWifiMode.GetUniqueName());
 		}
 	}
 }
 
 	std::vector <double>
-DmgAlmightyController::FlowRateProgressiveFilling(std::vector <double> flowsDmd, double fillingSteplength, uint32_t appPayloadBytes, double biOverheadFraction)
+DmgAlmightyController::FlowRateProgressiveFilling(std::vector <double> flowsDmd, double fillingSteplength, uint32_t appPayloadBytes, double biOverheadFraction, uint32_t nMpdus)
 {
 	NS_LOG_FUNCTION(this);
 
-	ConfigurePhyRate(appPayloadBytes, biOverheadFraction);
+	ConfigurePhyRate(appPayloadBytes, biOverheadFraction, nMpdus);
 
 	std::vector <bool> ifActive (flowsDmd.size(), true);
 	std::vector <double> flowsRate (flowsDmd.size(), 0.0);
@@ -1454,7 +1470,13 @@ DmgAlmightyController::PrintIdealRxPowerAndMcs(void)
 	//print to file the ideal rate, for matlab DLMAC code
 
 	AsciiTraceHelper ascii;
-	Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream ("idealRate.txt");
+
+        std::ostringstream fileName_oss;
+			fileName_oss << "idealRate_"
+				<< Simulator::Now().GetMilliSeconds()/1000.0
+				<< "s.txt";
+
+	Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream (fileName_oss.str());
 
 	for (uint32_t staIdx = 0; staIdx < m_meshNodes->GetN(); staIdx++) {
 		for (uint32_t neighId = 0; neighId < m_meshNodes->GetN(); neighId++){
@@ -1484,7 +1506,13 @@ DmgAlmightyController::PrintIdealRxPowerAndMcs(void)
 DmgAlmightyController::PrintSpInfo(void)
 {
 	AsciiTraceHelper ascii;
-        Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream ("timeAlloc.txt");
+
+        std::ostringstream timeFileName_oss;
+			timeFileName_oss << "timeAlloc_"
+				<< Simulator::Now().GetMilliSeconds()/1000.0
+				<< "s.txt";
+
+        Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream (timeFileName_oss.str());
 
 	for (uint32_t staIdx = 0; staIdx < m_meshNodes->GetN(); staIdx++) {
 		Ptr<DmgBeaconInterval> dmgBiSta = m_meshNodes->Get(staIdx)->GetDevice(0)->

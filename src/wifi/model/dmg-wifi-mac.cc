@@ -996,4 +996,10 @@ DmgWifiMac::GetNMpduReturnDuration(Mac48Address mac)
 
   return duration;
 }
+
+void 
+DmgWifiMac::SetMaxNumMpdu(uint32_t num)
+{
+        m_low->SetMaxNumMpdu(num);
+}
 } // namespace ns3

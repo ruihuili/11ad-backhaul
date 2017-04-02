@@ -142,7 +142,7 @@ struct cliqueStruct
   void ConfigureRoutingBasedAssociation (void);
 
   void ConfigureCliques (void);
-  std::vector <double>  FlowRateProgressiveFilling(std::vector <double> flowsDmd, double fillingSteplength, uint32_t appPayloadBytes, double biOverheadFraction);
+  std::vector <double>  FlowRateProgressiveFilling(std::vector <double> flowsDmd, double fillingSteplength, uint32_t appPayloadBytes, double biOverheadFraction, uint32_t nMpdus);
   /* For each Mesh node, the controller assign the same amount of air-time to each
    * stations associated to that mesh station 
    */
@@ -165,7 +165,7 @@ struct cliqueStruct
    * with the 1) ideal phy rate as per MCS values (when m_phyRateEstimated == 0)
            or 2) estimated phy rates computed from measured 'round trip time' of mac nMPDUs (when m_phyRateEstimated == 1)
    * called by progressive filling*/
-  void ConfigurePhyRate(uint32_t appPayloadBytes, double biOverheadFraction);
+  void ConfigurePhyRate(uint32_t appPayloadBytes, double biOverheadFraction, uint32_t nMpdus);
   /* Force Block Ack agreement creation */
   void CreateBlockAckAgreement(void);
 

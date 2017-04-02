@@ -1008,7 +1008,7 @@ void MacLow::ReceiveOk (Ptr<Packet> packet, double rxSnr, WifiMode txMode, WifiP
 
                 if(it_cntr->second == 0 || it_sampled->second == samp)
                 {  
-                       NS_LOG_UNCOND(Simulator::Now () << " "<< m_self<< " set ReturnDuration to "<< samp << " mode "<< txMode << " destin mac " << m_macSampling); 
+                       NS_LOG_UNCOND(Simulator::Now () << " "<< m_self<< " set "<< m_maxNumMpdu << " mpdu ReturnDuration to "<< samp << " mode "<< txMode << " destin mac " << m_macSampling); 
                        it_sampled->second = samp;
                        it_cntr->second = 3;                               
                 } 
@@ -1999,8 +1999,8 @@ void MacLow::SendDataPacket (void)
 	m_currentPacket->AddTrailer (fcs);
     }
 
-
-        if (m_aggregateQueue->GetSize() == 30 && m_currentPacket->GetSize() > 100)
+        //NS_LOG_UNCOND("MPDUS: " << m_maxNumMpdu );
+        if (m_aggregateQueue->GetSize() == m_maxNumMpdu && m_currentPacket->GetSize() > 100)
         {
 
                 //check if records exists for this ip, if not, then create one
@@ -3181,12 +3181,18 @@ MacLow::GetNMpduReturnDuration (Mac48Address mac)
 {
   std::map<Mac48Address, Time>::const_iterator it = m_sampledDuration.find(mac);
 
-  NS_ASSERT(it != m_sampledDuration.end());
+  if(it == m_sampledDuration.end())
+      return NanoSeconds(0);
 
   if(it->second == NanoSeconds(0))
         NS_LOG_WARN("no sampled value yet");
 
   return it->second;
+}
+
+void MacLow::SetMaxNumMpdu(uint32_t num)
+{
+        m_maxNumMpdu = num;
 }
 
 } // namespace ns3
