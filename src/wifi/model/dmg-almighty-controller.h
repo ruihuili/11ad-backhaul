@@ -122,7 +122,7 @@ struct cliqueStruct
   double GetBiOverheadFraction (void);
   void SetBeamSwitchOverhead (uint64_t beamSwitchOverhead);
   uint64_t GetBeamSwitchOverhead (void);
-  double GetActualTxDurationNs(WifiMode mode);
+  double GetActualTxDurationNs(WifiMode mode, uint32_t nMpdus);
 
   /*Configure a single scheudel and buffer all sps in the structure conlictS */
   void ConfigureSchedule (void);

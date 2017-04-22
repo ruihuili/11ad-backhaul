@@ -1165,34 +1165,122 @@ void DmgAlmightyController::EnforceAdditionalSignalLossBetween(Ptr<Node> node1, 
 }
 
 
-double DmgAlmightyController::GetActualTxDurationNs(WifiMode mode)
+double DmgAlmightyController::GetActualTxDurationNs(WifiMode mode, uint32_t nMpdus)
 {
 	double ret = 0.0;
 	//if (ofdm) {// OFDM ONLY FOR NOW
 	if (mode == std::string("VHTMCS24a"))
-		ret = 65291;
+        {
+                if (nMpdus == 30)
+		        ret = 65291;
+                else if (nMpdus == 10)
+		        ret = 26107;
+                else if (nMpdus == 5)
+		        ret = 16880;
+                else if (nMpdus == 1)
+		        ret = 9624;
+        }
 	else if (mode == std::string("VHTMCS23a"))
-		ret = 69883;
-	else if (mode == std::string("VHTMCS22a"))
+        {
+                if (nMpdus == 30)
+		        ret = 69883;
+                else if (nMpdus == 10)
+                        ret = 27659;
+                else if (nMpdus == 5)
+		        ret = 17683;
+                else if (nMpdus == 1)
+		        ret = 9942;
+        }	
+        else if (mode == std::string("VHTMCS22a"))
+        {
+                if (nMpdus == 30)
 		ret = 81779;
-	else if (mode == std::string("VHTMCS21a"))
-		ret = 92700;
+                else if (nMpdus == 10)
+                        ret = 31582;
+                else if (nMpdus == 5)
+		        ret = 19728;
+                else if (nMpdus == 1)
+		        ret = 10282;
+        }	
+        else if (mode == std::string("VHTMCS21a"))
+        {
+                if (nMpdus == 30)
+		        ret = 92700;
+                else if (nMpdus == 10)
+                        ret = 35332;
+                else if (nMpdus == 5)
+		        ret = 21745;
+                else if (nMpdus == 1)
+		        ret = 10836;
+        }
 	else if (mode == std::string("VHTMCS20a"))
-		ret = 99481;
+        {
+                if (nMpdus == 30)
+		        ret = 99481;
+                else if (nMpdus == 10)
+                        ret = 37767;
+                else if (nMpdus == 5)
+		        ret = 22999;
+                else if (nMpdus == 1)
+		        ret = 11136;
+        }
 	else if (mode == std::string("VHTMCS19a"))
-		ret = 117180;
-	else if (mode == std::string("VHTMCS18a"))
-		ret = 143830;
-	else if (mode == std::string("VHTMCS17a"))
+        {
+                if (nMpdus == 30)
+		        ret = 117180;
+                else if (nMpdus == 10)
+                        ret = 43713;
+                else if (nMpdus == 5)
+                        ret = 26071;
+                else if (nMpdus == 1)
+		        ret = 11698;
+        }	
+        else if (mode == std::string("VHTMCS18a"))
+        {
+                if (nMpdus == 30)
+		        ret = 143830;
+                else if (nMpdus == 10)
+                        ret = 52724;
+                else if (nMpdus == 5)
+                        ret = 30454;
+                else if (nMpdus == 1)
+		        ret = 12782;
+        }
+	/*else if (mode == std::string("VHTMCS17a"))
+        {
+                if (nMpdus == 30)
 		ret = 188435;
-	else if (mode == std::string("VHTMCS16a"))
+                else if (nMpdus == 1)
+		        ret = 9624;
+	}
+        else if (mode == std::string("VHTMCS16a"))
+        {
+                if (nMpdus == 30)
 		ret = 223878;
-	else if (mode == std::string("VHTMCS15a"))
+                else if (nMpdus == 1)
+		        ret = 9624;
+	}
+        else if (mode == std::string("VHTMCS15a"))
+        {
+                if (nMpdus == 30)
 		ret = 277194;
-	else if (mode == std::string("VHTMCS14a"))
+                else if (nMpdus == 1)
+		        ret = 9624;
+	}
+        else if (mode == std::string("VHTMCS14a"))
+        {
+                if (nMpdus == 30)
 		ret = 437174;
+                else if (nMpdus == 1)
+		        ret = 9624;
+        }
 	else if (mode == std::string("VHTMCS13a"))
+        {
+                if (nMpdus == 30)
 		ret = 543726;
+                else if (nMpdus == 1)
+		        ret = 9624;
+        }*/
 	return ret;
 }
 
@@ -1212,15 +1300,15 @@ DmgAlmightyController::ConfigurePhyRate(uint32_t appPayloadBytes, double biOverh
 			//cliqueS[cIdx].phyRate[segIdx] = sta2NeiWifiMode.GetDataRate()/1e6;
                         Time duration = m_meshNodes->Get(staIdx)->GetDevice(0)->GetObject<WifiNetDevice>()->GetMac()->GetObject<DmgWifiMac>()->GetNMpduReturnDuration(neiMacAddr);
 
-                        if(duration.GetNanoSeconds())
+/*                        if(duration.GetNanoSeconds())
                         {
                                 cliqueS[cIdx].phyRate[segIdx] = double(nMpdus * (appPayloadBytes + 36) * 8 )/ duration.GetNanoSeconds() *1e3 *(1.0 - biOverheadFraction);
                                 NS_LOG_INFO("Using measured phy rate");
                         }
-                        else
+                        else*/
                         {
                                 NS_LOG_INFO("Using hard coded phy rate");
-                                cliqueS[cIdx].phyRate[segIdx] = double(30 * (appPayloadBytes + 36) * 8 )/GetActualTxDurationNs(sta2NeiWifiMode)*1e3 *(1.0 - biOverheadFraction);//sta2NeiWifiMode.GetDataRate()/1e6;
+                                cliqueS[cIdx].phyRate[segIdx] = double(nMpdus * (appPayloadBytes + 36) * 8 )/GetActualTxDurationNs(sta2NeiWifiMode, nMpdus)*1e3 *(1.0 - biOverheadFraction);//sta2NeiWifiMode.GetDataRate()/1e6;
                         }
 
 			NS_LOG_INFO("Equiv phy rate between "<< staIdx << " and " << neiIdx << " is " << cliqueS[cIdx].phyRate[segIdx] << "Mb/s. wifi mode" << sta2NeiWifiMode.GetUniqueName());
