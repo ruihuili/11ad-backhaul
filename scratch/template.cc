@@ -81,11 +81,11 @@ RxSeqTracer (Ptr<OutputStreamWrapper> stream, SequenceNumber32 oldval, SequenceN
 	static void
 ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t> > flowPath, uint16_t scenario)
 {
-	fileNameBase.append("sub/");
+	fileNameBase.append("subflows/");
 	//DL flow for now, flows share the same source, hence the socket index increases. sinks varies -> socket remains for RxSeqTracer
 	for (uint32_t flowIdx=0; flowIdx< flowPath.size(); flowIdx++)
 	{		
-		for (uint32_t subf = 0; subf < 50; subf++)
+		for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf= subf + 50)
 		{
 			std::ostringstream tail;
 			uint32_t socketId;
@@ -815,7 +815,7 @@ void SetupDmgController (struct sim_config *config)
 
 	config->predictedFlowRate = config->dmgCtrl->FlowRateProgressiveFilling(config->flowsDmd, config->proFillStepL, config->appPayloadBytes, config->biOverheadFraction, config->nMpdus);
 
-	config->predictedFlowRate = config->dmgCtrl->FlowRateMaxDlmac(config->appPayloadBytes, config->biOverheadFraction);
+	//config->predictedFlowRate = config->dmgCtrl->FlowRateMaxDlmac(config->appPayloadBytes, config->biOverheadFraction);
 	/* Let the DmgAlmightyController know the Beacon Interval duration */
 	config->dmgCtrl->SetBiDuration(config->biDurationNs);
 	/* Let the DmgAlmightyController know the fraction of the Beacon Interval that
@@ -832,6 +832,8 @@ void SetupDmgController (struct sim_config *config)
 	if (config->nMpdus > 0) {
 		config->dmgCtrl->CreateBlockAckAgreement();
 	}
+
+	config->dmgCtrl->ConfigureWritePath(config->dir_oss.str());
 }
 
 void StartDmdRateMeasurement (struct sim_config *config)
@@ -967,7 +969,8 @@ void SetupOnOffTraffic(struct sim_config *config, std::string protocol)
 }
 
 void SetupDashAdaptRateTraffic(struct sim_config *config, std::string protocol)
-{		
+{	
+	NS_LOG_INFO("setting "<< NUM_SUB_FLOWS << " subflows for DashRate app");	
 	for (uint32_t flowIdx = 0; flowIdx< config->flowsPath.size(); flowIdx++)
 	{
 		for (uint32_t subf =0; subf < NUM_SUB_FLOWS; subf++)
@@ -1043,7 +1046,7 @@ int main (int argc, char *argv[])
 	//TcpSocket maximum transmit buffer size (bytes) default 131072(128k)
 	Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (10000000));
 	Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (10000000));
-	Config::SetDefault ("ns3::TcpSocket::InitialSlowStartThreshold", UintegerValue (5000000));//65535 by default
+	Config::SetDefault ("ns3::TcpSocket::InitialSlowStartThreshold", UintegerValue (65535));//5000000//65535 by default
 
 	//Config::SetDefault ("ns3::TcpSocketBase::MaxWindowSize", UintegerValue (65535));//will be scaled to 1073725440 (14 bits to the left)
 	/* By default the simulation lasts for 10 seconds */
@@ -1175,6 +1178,8 @@ int main (int argc, char *argv[])
 
 	if(config.scenario > 10 && config.scenario <= 20)
 	{
+		//read from 
+		//write to --> topo*/scenario*/mpdu*/
 		uint32_t topology =  config.scenario - 10;
 		NS_LOG_INFO("input topology: " << topology);
 		//overwrite the user input of 'inputFileName'
@@ -1184,6 +1189,14 @@ int main (int argc, char *argv[])
 		NS_LOG_INFO("input path: " << input_oss.str()); 
 		config.inputFileName = input_oss.str();
 		config.dir_oss << "topo"<< topology << "/scenario"  << config.scenario << "/mpdu"<< config.nMpdus << "/";
+		NS_LOG_INFO("output path: " << config.dir_oss.str());
+	}
+	else if(config.scenario <= 10)
+	{
+		if(config.trafficType == "udp")
+			config.dir_oss << "topoNottin/scenario"  << config.scenario << "/udp/";
+		else if (config.trafficType == "tcp")		
+			config.dir_oss << "topoNottin/scenario"  << config.scenario << "/tcp/";
 		NS_LOG_INFO("output path: " << config.dir_oss.str());
 	}
 
@@ -1390,14 +1403,14 @@ int main (int argc, char *argv[])
 	}
 	else if (config.trafficType == "tcp")
 	{
-		config.dir_oss << "tcp/";
+		//config.dir_oss << "tcp/";
 
 		if(config.scenario == 3)
 			SetupDashAdaptRateTraffic(&config, "ns3::TcpSocketFactory");//TODO: check this func for tcp
 		else
 			SetupOnOffTraffic(&config, "ns3::TcpSocketFactory");
 		//temp 
-		//Simulator::Schedule (Seconds (1.01), &ConnectTcpTracers, config.dir_oss.str(), config.flowsPath, config.scenario);
+		Simulator::Schedule (Seconds (1.01), &ConnectTcpTracers, config.dir_oss.str(), config.flowsPath, config.scenario);
 	}
 	else
 		NS_LOG_ERROR("Unknown transport protocol");

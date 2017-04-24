@@ -293,6 +293,11 @@ DmgAlmightyController::GetServicePeriodAllocation (void)
 	return m_spAlloc;
 }
 
+	void
+DmgAlmightyController::ConfigureWritePath (std::string w2str)
+{
+        m_writePath = w2str; 
+}
 /*Read from flowsPath and build a topology knowledge of Cliques and link list 
  * that will help in configuring wifi manager and preparing for progressive filling
  */
@@ -1560,7 +1565,7 @@ DmgAlmightyController::PrintIdealRxPowerAndMcs(void)
 	AsciiTraceHelper ascii;
 
         std::ostringstream fileName_oss;
-			fileName_oss << "idealRate_"
+			fileName_oss << m_writePath<< "/idealRate_"
 				<< Simulator::Now().GetMilliSeconds()/1000.0
 				<< "s.txt";
 
@@ -1596,7 +1601,7 @@ DmgAlmightyController::PrintSpInfo(void)
 	AsciiTraceHelper ascii;
 
         std::ostringstream timeFileName_oss;
-			timeFileName_oss << "timeAlloc_"
+			timeFileName_oss << m_writePath<< "/timeAlloc_"
 				<< Simulator::Now().GetMilliSeconds()/1000.0
 				<< "s.txt";
 
