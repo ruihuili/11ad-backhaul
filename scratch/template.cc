@@ -21,7 +21,7 @@ using namespace ns3;
 
 #define SSID_STR		"test"
 #define DESTINATION_PORT_BASE	20000
-#define NUM_SUB_FLOWS	300
+#define NUM_SUB_FLOWS	100
 
 NS_LOG_COMPONENT_DEFINE ("DmgSimple");
 
@@ -85,7 +85,7 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 	//DL flow for now, flows share the same source, hence the socket index increases. sinks varies -> socket remains for RxSeqTracer
 	for (uint32_t flowIdx=0; flowIdx< flowPath.size(); flowIdx++)
 	{		
-		for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf= subf + 50)
+		for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf= subf + 10)
 		{
 			std::ostringstream tail;
 			uint32_t socketId;
@@ -100,7 +100,7 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 			{
 				//naming format: cwnd-flow-subflow.dat
 				tail << flowIdx << "-"<< subf <<".dat"; 
-				socketId = subf;
+				socketId = flowIdx * NUM_SUB_FLOWS + subf;
 			}
 			//CWND
 			std::ostringstream fileName_oss;
@@ -140,6 +140,44 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 			stream = ascii.CreateFileStream (fileName_oss.str ());
 			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/RTO" ;
 			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&RtoTracer, stream));
+
+
+			//RwndTracer
+			fileName_oss.str("");  //		fileName_oss.clear();
+			tracePath_oss.str(""); //		tracePath_oss.clear();
+
+			fileName_oss << fileNameBase << "rwnd-"  << tail.str();  		
+			stream = ascii.CreateFileStream (fileName_oss.str ());
+			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/RWND" ;
+			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&RwndTracer, stream));
+
+			//RxSeqTracer --tcp rx buffer
+			fileName_oss.str("");  //		fileName_oss.clear();
+			tracePath_oss.str(""); //		tracePath_oss.clear();
+
+			fileName_oss << fileNameBase << "rxseq-"  << tail.str();  		
+			stream = ascii.CreateFileStream (fileName_oss.str ());
+			//subf + 100 --> by accident
+			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).back() <<"/$ns3::TcpL4Protocol/SocketList/"<< subf + 100 << "/RxBuffer/NextRxSequence" ;
+			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&RxSeqTracer, stream));
+
+			//UnackSequence
+			fileName_oss.str("");  //               fileName_oss.clear();
+			tracePath_oss.str(""); //               tracePath_oss.clear();
+
+			fileName_oss << fileNameBase << "unackseq-"  << tail.str();             
+			stream = ascii.CreateFileStream (fileName_oss.str ());
+			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/TxBuffer/UnackSequence" ;
+			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&UnackSeqTracer, stream));
+
+			//HseqTracer: for the HighestSequence sent
+			fileName_oss.str("");  //		fileName_oss.clear();
+			tracePath_oss.str(""); //		tracePath_oss.clear();
+
+			fileName_oss << fileNameBase << "hseq-"  << tail.str();  		
+			stream = ascii.CreateFileStream (fileName_oss.str ());
+			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId << "/HighestSequence" ;
+			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&HseqTracer, stream));
 
 			if(scenario !=3)
 				break; //break from subflow loop
@@ -440,7 +478,10 @@ void WriteTpFiles(struct sim_config *config)
 		if(config->scenario == 3){
 			for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf++)
 			{
-				rx_bytes += DynamicCast<PacketSink>(config->servers->Get (flowIdx * NUM_SUB_FLOWS + subf))->GetTotalRx ();//the total bytes received in this sink app 
+				uint64_t subflowrx = DynamicCast<PacketSink>(config->servers->Get (flowIdx * NUM_SUB_FLOWS + subf))->GetTotalRx ();
+				NS_LOG_INFO(now_t<< " Flow "<< flowIdx <<" subflow "<< subf << " rx "<< subflowrx <<" in total");
+				std::cout << now_t<< " Flow "<< flowIdx <<" subflow "<< subf << " rx "<< subflowrx <<" in total" << std::endl;
+				rx_bytes += subflowrx;//the total bytes received in this sink app 
 
 				tx_bytes += DynamicCast<DashRateAdaptationApplication>(config->clients->Get (flowIdx * NUM_SUB_FLOWS + subf))->GetTotalTxBytes ();
 			}
@@ -470,7 +511,7 @@ void WriteTpFiles(struct sim_config *config)
 		config->lastTxMbits[flowIdx] = cur_tx_Mbits;
 		config->lastMacRxMbits[flowIdx] = cur_rx_Mbits_mac;
 	}
-	Simulator::Schedule(NanoSeconds(config->biDurationNs), WriteTpFiles, config);
+	Simulator::Schedule(Seconds(1), WriteTpFiles, config);
 	*(config->lastReportTime) = now_t;
 }
 
@@ -1050,7 +1091,7 @@ int main (int argc, char *argv[])
 
 	//Config::SetDefault ("ns3::TcpSocketBase::MaxWindowSize", UintegerValue (65535));//will be scaled to 1073725440 (14 bits to the left)
 	/* By default the simulation lasts for 10 seconds */
-	double simulationTime = 20;
+	double simulationTime = 50;
 	/*Simulation scenario*/
 	int16_t scenario = 1;
 	/* By default the simulation is the NS-3 default */

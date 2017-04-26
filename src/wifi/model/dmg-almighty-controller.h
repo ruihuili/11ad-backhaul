@@ -138,6 +138,8 @@ struct cliqueStruct
    */
   void ConfigureWifiManager (void);
 
+  void ConfigureWritePath (std::string w2str);
+
   //void ConfigureStadardBasedAssociation (void);
   void ConfigureRoutingBasedAssociation (void);
 
@@ -286,6 +288,9 @@ private:
 
    std::map <int32_t, int32_t> m_master;
    std::map <int32_t, int32_t> m_masterClique;
+
+
+   std::string m_writePath;
 
 };
 
