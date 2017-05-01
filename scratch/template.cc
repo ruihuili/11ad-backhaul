@@ -44,7 +44,9 @@ SsThreshTracer (Ptr<OutputStreamWrapper> stream, uint32_t oldval, uint32_t newva
 	static void
 RttTracer (Ptr<OutputStreamWrapper> stream, Time oldval, Time newval)
 {
+//if((newval - oldval).GetMicroSeconds() > 100)
 	*stream->GetStream () << Simulator::Now ().GetSeconds () << " " << newval.GetSeconds () << std::endl;
+//	*stream->GetStream () << newval.GetMilliSeconds () << std::endl;
 }
 
 	static void
@@ -85,7 +87,7 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 	//DL flow for now, flows share the same source, hence the socket index increases. sinks varies -> socket remains for RxSeqTracer
 	for (uint32_t flowIdx=0; flowIdx< flowPath.size(); flowIdx++)
 	{		
-		for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf= subf + 10)
+		for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf= subf + 1)
 		{
 			std::ostringstream tail;
 			uint32_t socketId;
@@ -99,7 +101,7 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 			else 
 			{
 				//naming format: cwnd-flow-subflow.dat
-				tail << flowIdx << "-"<< subf <<".dat"; 
+				tail << flowIdx << "-sub"<< subf <<".txt"; 
 				socketId = flowIdx * NUM_SUB_FLOWS + subf;
 			}
 			//CWND
@@ -110,19 +112,10 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 			Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream (fileName_oss.str ());
 
 			std::ostringstream tracePath_oss;
-			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/CongestionWindow" ;
+/*			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/CongestionWindow" ;
 
 			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&CwndTracer, stream));
-
-			//SsThresh
-			fileName_oss.str("");  //		fileName_oss.clear();
-			tracePath_oss.str(""); //		tracePath_oss.clear();
-
-			fileName_oss << fileNameBase << "ssthresh-"  << tail.str();
-			stream = ascii.CreateFileStream (fileName_oss.str ());
-			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/SlowStartThreshold" ;
-			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&SsThreshTracer, stream));
-
+*/
 			//RTT
 			fileName_oss.str("");  //		fileName_oss.clear();
 			tracePath_oss.str(""); //		tracePath_oss.clear();
@@ -131,6 +124,16 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 			stream = ascii.CreateFileStream (fileName_oss.str ());
 			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/RTT" ;
 			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&RttTracer, stream));
+
+/*
+			//SsThresh
+			fileName_oss.str("");  //		fileName_oss.clear();
+			tracePath_oss.str(""); //		tracePath_oss.clear();
+
+			fileName_oss << fileNameBase << "ssthresh-"  << tail.str();
+			stream = ascii.CreateFileStream (fileName_oss.str ());
+			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId <<"/SlowStartThreshold" ;
+			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&SsThreshTracer, stream));
 
 			//RTO
 			fileName_oss.str("");  //		fileName_oss.clear();
@@ -178,7 +181,7 @@ ConnectTcpTracers (std::string fileNameBase, std::vector < std::vector <uint32_t
 			stream = ascii.CreateFileStream (fileName_oss.str ());
 			tracePath_oss << "/NodeList/"<< flowPath.at(flowIdx).front() <<"/$ns3::TcpL4Protocol/SocketList/"<< socketId << "/HighestSequence" ;
 			Config::ConnectWithoutContext (tracePath_oss.str (), MakeBoundCallback (&HseqTracer, stream));
-
+*/
 			if(scenario !=3)
 				break; //break from subflow loop
 		}
@@ -479,8 +482,8 @@ void WriteTpFiles(struct sim_config *config)
 			for (uint32_t subf = 0; subf < NUM_SUB_FLOWS; subf++)
 			{
 				uint64_t subflowrx = DynamicCast<PacketSink>(config->servers->Get (flowIdx * NUM_SUB_FLOWS + subf))->GetTotalRx ();
-				NS_LOG_INFO(now_t<< " Flow "<< flowIdx <<" subflow "<< subf << " rx "<< subflowrx <<" in total");
-				std::cout << now_t<< " Flow "<< flowIdx <<" subflow "<< subf << " rx "<< subflowrx <<" in total" << std::endl;
+				//NS_LOG_INFO(now_t<< " Flow "<< flowIdx <<" subflow "<< subf << " rx "<< subflowrx <<" in total");
+
 				rx_bytes += subflowrx;//the total bytes received in this sink app 
 
 				tx_bytes += DynamicCast<DashRateAdaptationApplication>(config->clients->Get (flowIdx * NUM_SUB_FLOWS + subf))->GetTotalTxBytes ();
@@ -511,6 +514,8 @@ void WriteTpFiles(struct sim_config *config)
 		config->lastTxMbits[flowIdx] = cur_tx_Mbits;
 		config->lastMacRxMbits[flowIdx] = cur_rx_Mbits_mac;
 	}
+	config->dmgCtrl->PrintIdealRxPowerAndMcs();
+
 	Simulator::Schedule(Seconds(1), WriteTpFiles, config);
 	*(config->lastReportTime) = now_t;
 }
@@ -1033,7 +1038,7 @@ void SetupDashAdaptRateTraffic(struct sim_config *config, std::string protocol)
 			ApplicationContainer clientApp = clientHelper.Install (config->meshNodes->Get(config->flowsPath.at(flowIdx).front()));
 			//NS_LOG_INFO("install on off traffic client (src) in" << config->flowsPath.at(flowIdx).front() << " port "<< DESTINATION_PORT_BASE + flowIdx*1000 + subf );
 
-			clientApp.Start (Seconds (1) + NanoSeconds(subf));
+			clientApp.Start (Seconds (1));// + NanoSeconds(subf));
 			clientApp.Stop (Seconds (config->simulationTime + 1));
 			clientApp.Get(0)->GetObject<DashRateAdaptationApplication>()->SetBitRateMap(config->rateProb);
 			config->clients->Add(clientApp);
@@ -1145,7 +1150,7 @@ int main (int argc, char *argv[])
 	/*By default there are 5 schedule per Bi*/
 	uint32_t numSchedulePerBi = 20;
 	/*By default the fraction of time used for traffic of inverse direction (e.g. tcp ack) is 0*/
-	double ackTraffFrac = 0.0571;//94/(1554+94)= 0.057038835
+	double ackTraffFrac = 0.06;//94/(1554+94)= 0.057038835
 
 	std::string inputFileName ="scratch/Nottin.txt";//"Fig4_inverse.txt";//
 
@@ -1249,7 +1254,8 @@ int main (int argc, char *argv[])
 	config.proFillStepL = proFillStepL;
 	config.ifPrint = ifPrint;
 	config.ifVbr = ifVbr;
-	config.numSchedulePerBi = (config.trafficType == "udp")?numSchedulePerBi:(numSchedulePerBi - 5);
+//	config.numSchedulePerBi = (config.trafficType == "udp")?numSchedulePerBi:(numSchedulePerBi - 5);
+	config.numSchedulePerBi = numSchedulePerBi;
 	config.ackTraffFrac = (config.trafficType == "udp")?(0.0):ackTraffFrac;
 
 
