@@ -1832,7 +1832,7 @@ EdcaTxopN::StopDmgSp ()
 	NS_LOG_DEBUG(now<<"(now). Next Tx SP starts at "<< m_nextSpStart <<" stops at "<<m_nextSpStop << " to "<< m_dmgNextSpDestination);
 
 	if ((m_currentPacket != 0) && (m_currentHdr.IsQosData ())) {
-                NS_LOG_UNCOND(now<<" mac "<< m_low->GetAddress () << "SP stopps. PUSH CURRENT PACKET to "<<m_currentHdr.GetAddr1()<<" back." );
+                //NS_LOG_UNCOND(now<<" mac "<< m_low->GetAddress () << "SP stopps. PUSH CURRENT PACKET to "<<m_currentHdr.GetAddr1()<<" back." );
 		m_queue->PushFront (m_currentPacket, m_currentHdr);
 	}
 	m_currentPacket = 0;

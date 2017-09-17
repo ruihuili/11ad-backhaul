@@ -997,7 +997,7 @@ void MacLow::ReceiveOk (Ptr<Packet> packet, double rxSnr, WifiMode txMode, WifiP
 
         if (m_macSampling == hdr.GetAddr2 ()  && m_seqSampling == blockAck.GetStartingSequence())
         {
-                NS_LOG_UNCOND (" block ack from " << hdr.GetAddr2 () <<" starting seq " << blockAck.GetStartingSequence() <<" sampling seq "<< m_seqSampling);
+                //NS_LOG_UNCOND (" block ack from " << hdr.GetAddr2 () <<" starting seq " << blockAck.GetStartingSequence() <<" sampling seq "<< m_seqSampling);
                 std::map<Mac48Address, Time>::iterator it_sampled = m_sampledDuration.find(m_macSampling);
                 std::map<Mac48Address, Time>::const_iterator it_samplingStart = m_samplingStartTime.find(m_macSampling);
                 std::map<Mac48Address, uint16_t>::iterator it_cntr = m_sampleVarCounter.find(m_macSampling);
@@ -1008,14 +1008,14 @@ void MacLow::ReceiveOk (Ptr<Packet> packet, double rxSnr, WifiMode txMode, WifiP
 
                 if(it_cntr->second == 0 || it_sampled->second == samp)
                 {  
-                       NS_LOG_UNCOND(Simulator::Now () << " "<< m_self<< " set "<< m_maxNumMpdu << " mpdu ReturnDuration to "<< samp << " mode "<< txMode << " destin mac " << m_macSampling); 
+                       //NS_LOG_UNCOND(Simulator::Now () << " "<< m_self<< " set "<< m_maxNumMpdu << " mpdu ReturnDuration to "<< samp << " mode "<< txMode << " destin mac " << m_macSampling); 
                        it_sampled->second = samp;
                        it_cntr->second = 3;                               
                 } 
                 else    
                 {
                         it_cntr->second--;
-                        NS_LOG_UNCOND(Simulator::Now () << " "<< m_self<< " new ReturnDuration detected "<< samp << " mode "<< txMode << " destin mac " << m_macSampling << " for " << 3 - it_cntr->second);   
+                        //NS_LOG_UNCOND(Simulator::Now () << " "<< m_self<< " new ReturnDuration detected "<< samp << " mode "<< txMode << " destin mac " << m_macSampling << " for " << 3 - it_cntr->second);   
                 }
                 //NS_LOG_UNCOND("Stop tracking "<< Simulator::Now ()<<" from "<< m_currentHdr.GetAddr2()<<" to "<< m_currentHdr.GetAddr1());    
                 //NS_LOG_UNCOND(m_self<< " ReturnDuration: "<< it_sampled->second << " mode "<< txMode << " destin ip " << ipv4Addr);    

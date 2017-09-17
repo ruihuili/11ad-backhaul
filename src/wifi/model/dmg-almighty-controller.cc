@@ -744,7 +744,7 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 
 	//Install the schedule multiple times
 	for (uint32_t scheIdx=0; scheIdx < m_numSchedulePerBi; scheIdx++){
-                //if(scheIdx ==0)
+                if(scheIdx ==0)
 		NS_LOG_INFO("<<<<<<<<<< Example schedule >>> Starts at "<< scheduleStartNs <<" Ends at "<< scheduleStartNs + scheduleDurNs<<" >>>>>>>>>>>>>>>>>>>>>>");
 		for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++){
 			uint32_t conflictNode = conflictNodes.at(cIdx);
@@ -813,21 +813,21 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 					}
 				}
 				else if (std::find(conflictNodes.begin(), conflictNodes.end(), staIdx) != conflictNodes.end()){
-                                        //if(scheIdx ==0)
+                                        if(scheIdx ==0)
 					NS_LOG_INFO("STA" << staIdx << " is Cfl of other clique (skipping)");
 					continue;
 				}
 				else{
                                         //if(scheIdx ==0)
 					//the sta is not cfl
-					NS_LOG_INFO("STA " << staIdx << " isn't a Cfl");
+					//NS_LOG_INFO("STA " << staIdx << " isn't a Cfl");
 
 					std::vector <uint32_t> segIdOrder;
 					std::vector <uint32_t> bufIdOrder;
 					std::vector <uint64_t> refStartTime;
 					for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flowSegs.size(); segIdx++){
 						if ((cliqueS[cIdx].flowSegs[segIdx][0] == staIdx)||(cliqueS[cIdx].flowSegs[segIdx][1] == staIdx)){
-							NS_LOG_INFO("STA " << staIdx << "is in seg "<< segIdx );
+							//NS_LOG_INFO("STA " << staIdx << "is in seg "<< segIdx );
 							for (uint32_t bIdx = 0; bIdx < cliqueS[cIdx].bufStart[segIdx].size(); bIdx++){
 								//NS_LOG_INFO("   the " << bIdx << " buffer is noted." );
 								segIdOrder.push_back(segIdx);
@@ -1601,10 +1601,11 @@ DmgAlmightyController::PrintSpInfo(void)
 	AsciiTraceHelper ascii;
 
         std::ostringstream timeFileName_oss;
-			timeFileName_oss << m_writePath<< "/timeAlloc_"
+			timeFileName_oss << m_writePath<< "timeAlloc_"
 				<< Simulator::Now().GetMilliSeconds()/1000.0
 				<< "s.txt";
 
+        NS_LOG_INFO("SP info printed to file " << timeFileName_oss.str());
         Ptr<OutputStreamWrapper> stream = ascii.CreateFileStream (timeFileName_oss.str());
 
 	for (uint32_t staIdx = 0; staIdx < m_meshNodes->GetN(); staIdx++) {
@@ -1706,7 +1707,3 @@ DmgAlmightyController::ConfigureAntennaAlignment (void)
 
 }
 // namespace ns3
-
-
-
-
