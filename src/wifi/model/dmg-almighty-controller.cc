@@ -423,7 +423,7 @@ DmgAlmightyController::ConfigureCliques (void)
 					cliqueS[cIdx].flowSegs.push_back(link);
 
 					cliqueS[cIdx].phyRate.push_back(0);
-					cliqueS[cIdx].timeAlloc.push_back(0);//Initiate time for each flow segment.
+					cliqueS[cIdx].timeAlloc.push_back(0);//Initiate time for each flow segment. Will be configured in progressive filling
 				}
 			}
 		}
@@ -462,17 +462,16 @@ DmgAlmightyController::GetGw  (void)
 	return m_gw;
 }
 
-	std::vector <uint32_t>
+void
 DmgAlmightyController::ConfigureHierarchy (void)
 {
 	NS_LOG_FUNCTION(this);
 	std::vector < std::vector <uint32_t> > hierarchy;
 	std::vector <uint32_t> conflictNodes;
-	std::vector <uint32_t> schedulingOrder;
 
-
-        m_master.clear();
-        m_masterClique.clear();
+    m_master.clear();
+    m_masterClique.clear();
+    m_schedulingOrder.clear();
 
 	for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++) 
 	{
@@ -482,7 +481,7 @@ DmgAlmightyController::ConfigureHierarchy (void)
 		{
 			m_master.insert(std::pair<int32_t, int32_t>(cfl, 0));
 			m_masterClique.insert(std::pair<int32_t, int32_t>(cfl, 0));
-			schedulingOrder.push_back(cfl);
+			m_schedulingOrder.push_back(cfl);
 		}
 		else{
 			m_master.insert(std::pair<int32_t, int32_t>(cfl, -1));
@@ -541,7 +540,7 @@ DmgAlmightyController::ConfigureHierarchy (void)
 					nthLevel.push_back(*itNeigh);
 					//scheduling order
 
-					schedulingOrder.push_back(idNodeClq);     
+					m_schedulingOrder.push_back(idNodeClq);
 				}
 			}
 		}
@@ -555,7 +554,160 @@ DmgAlmightyController::ConfigureHierarchy (void)
 				orphanN++;
 		}
 	}
-	return schedulingOrder;
+    //Main hierarchy shall be ready upto this point
+    //if simulating interfering scenario,
+    //this is to configure which nodes are interfering with each other
+    //and to add the interfering cliques, which shall obey to the scheduling order just configured
+    //note: dimentions of clique and m_schedulingOrder will be different
+    if(m_sim_interference){
+        ConfigureInterferenceSets();
+    }
+}
+    
+void DmgAlmightyController::ConfigureInterferenceSets(void)
+{
+    m_intfStas.clear();
+    for (uint32_t staIdx = 0; staIdx < m_meshNodes->GetN(); staIdx++) {
+        for (uint32_t linkIdx = 0; linkIdx < m_linkList.size(); linkIdx++){
+            uint32_t neighId;
+            
+            if (staIdx != m_linkList[linkIdx][0] && staIdx != m_linkList[linkIdx][1])
+                continue;
+            else
+                neighId = (staIdx == m_linkList[linkIdx][0])?(m_linkList[linkIdx][1]):(m_linkList[linkIdx][0]);
+            
+            Ptr<DmgWifiMac> staMac =
+            m_meshNodes->Get(staIdx)->GetDevice(0)->GetObject<WifiNetDevice>()->
+            GetMac()->GetObject<DmgWifiMac>();
+            Ptr<DmgWifiMac> neiMac =
+            m_meshNodes->Get(neighId)->GetDevice(0)->GetObject<WifiNetDevice>()->
+            GetMac()->GetObject<DmgWifiMac>();
+            
+            Ptr<DmgDestinationFixedWifiManager> staManager = staMac->
+            GetWifiRemoteStationManager()->GetObject<DmgDestinationFixedWifiManager>();
+            Ptr<DmgDestinationFixedWifiManager> neiManager = neiMac->
+            GetWifiRemoteStationManager()->GetObject<DmgDestinationFixedWifiManager>();
+            
+            double neiRxPower = GetIdealRxPower(m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
+            double staRxPower = GetIdealRxPower(m_meshNodes->Get(neighId), m_meshNodes->Get(staIdx));
+            //-----------------------measure interference for other stations
+            for (uint32_t intfLinkIdx = 0; intfLinkIdx < m_linkList.size(); intfLinkIdx++){
+                uint32_t aIntf = m_linkList[intfLinkIdx][0];
+                uint32_t bIntf = m_linkList[intfLinkIdx][1];
+                
+                if (staIdx == aIntf || staIdx == bIntf || neighId == aIntf || neighId == bIntf)
+                    continue;
+                
+                double aRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][0]), m_meshNodes->Get(bIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
+                double bRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][1]), m_meshNodes->Get(aIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
+                
+                if (aRxPower > -1.0e6){
+                    NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
+                    NS_LOG_UNCOND("Interference>>>>>>" << aIntf << " rx power "<< aRxPower<< " when switch to " << bIntf);
+                    std::vector <uint32_t> interfSet (4);
+                    interfSet[0] = staIdx;
+                    interfSet[1] = neighId;
+                    interfSet[2] = aIntf;
+                    interfSet[3] = bIntf;
+                    m_intfStas.push_back(interfSet);
+                }
+                if (bRxPower > -1.0e6){
+                    NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
+                    NS_LOG_UNCOND("Interference>>>>>>" << bIntf << " rx power "<< bRxPower<< " when switch to " << aIntf);
+                    std::vector <uint32_t> interfSet (4);
+                    interfSet[0] = staIdx;
+                    interfSet[1] = neighId;
+                    interfSet[2] = bIntf;
+                    interfSet[3] = aIntf;
+                    m_intfStas.push_back(interfSet);
+                }
+                
+            }
+        }
+    }
+    //////////////////////////////////////////////////////////
+    //-------------add to 'interfering cliques'
+    //Mark the start of interfering clique in the array of cliques
+    m_interfCliqueStart = cliqueS.size();
+    for (uint32_t intf_set_id = 0; intf_set_id< m_intfStas.size(); intf_set_id ++){
+        
+        
+        //////////////////////////////to avoid adding the same set of stations again
+        bool if_recorded = false;
+        if (intf_set_id > 0){
+            for (uint32_t cId = m_interfCliqueStart; cId < cliqueS.size(); cId ++ ){
+                uint32_t num_same = 0;
+                for (uint32_t i= 0; i < m_intfStas[intf_set_id].size(); i++){
+                    if (std::find(cliqueS[cId].staMem.begin(), cliqueS[cId].staMem.end(), m_intfStas[intf_set_id][i])!=  cliqueS[cId].staMem.end()){
+                        num_same++;
+                    }
+                    if (num_same == m_intfStas[intf_set_id].size()){
+                        if_recorded = true;
+                    }
+                }
+            }
+        }
+        
+        if(if_recorded)
+            continue;
+        //////////////////////////////to avoid adding the same set of stations again--end
+        
+        cliqueStruct c;
+        c.staMem= m_intfStas[intf_set_id]; //sort the order of members so that 'conflict node' is at the end? do we need cfl node for such cliques?
+        c.staMemN = m_intfStas[intf_set_id].size();
+        
+        cliqueS.push_back(c);
+        
+        uint32_t cIdx = cliqueS.size() - 1;
+        NS_LOG_INFO("adding interfering clique "<< cIdx);
+        for (uint32_t flowIdx=0; flowIdx < m_flowsPath.size(); flowIdx++){
+                //build clique.flows and clique.flowSegs using flowPath
+            for (uint32_t i = 0; i < m_flowsPath[flowIdx].size() - 1; i++){
+                //add flow seg to clique if the interfering links are in the flow
+                if (((cliqueS[cIdx].staMem[0] == m_flowsPath[flowIdx][i]) && (cliqueS[cIdx].staMem[1] == m_flowsPath[flowIdx][i + 1])) || ((cliqueS[cIdx].staMem[2] == m_flowsPath[flowIdx][i]) && (cliqueS[cIdx].staMem[3] == m_flowsPath[flowIdx][i + 1])) || ((cliqueS[cIdx].staMem[0] == m_flowsPath[flowIdx][i + 1]) && (cliqueS[cIdx].staMem[1] == m_flowsPath[flowIdx][i])) || ((cliqueS[cIdx].staMem[2] == m_flowsPath[flowIdx][i + 1]) && (cliqueS[cIdx].staMem[3] == m_flowsPath[flowIdx][i])) )
+                {
+                    NS_LOG_INFO("---- with flow "<< flowIdx);
+                    cliqueS[cIdx].flows.push_back(flowIdx);
+                    
+                    std::vector <uint32_t> link;
+                    link.push_back(m_flowsPath[flowIdx][i]);
+                    link.push_back(m_flowsPath[flowIdx][i+1]);
+                    
+                    cliqueS[cIdx].flowSegs.push_back(link);
+                    
+                    for (uint32_t j = 0; j < link.size(); j++){
+                        NS_LOG_INFO("between "<< link[j]);
+                    }
+                    cliqueS[cIdx].phyRate.push_back(0);
+                    cliqueS[cIdx].timeAlloc.push_back(0);//Initiate time for each flow segment. Will be configured in progressive filling
+                }
+            }
+        }
+
+    }
+    
+/*    for ( uint32_t flowIdx=0; flowIdx < m_flowsPath.size(); flowIdx++){
+        for ( uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++){
+            //build clique.flows and clique.flowSegs using flowPath
+            for (uint32_t i = 0; i < m_flowsPath[flowIdx].size() - 1; i++){
+                //if the clique has both stations of the current link
+                if((std::find(cliqueS[cIdx].staMem.begin(), cliqueS[cIdx].staMem.end(), m_flowsPath[flowIdx][i]) != cliqueS[cIdx].staMem.end()) && (std::find(cliqueS[cIdx].staMem.begin(), cliqueS[cIdx].staMem.end(), m_flowsPath[flowIdx][i+1]) != cliqueS[cIdx].staMem.end())){
+                    cliqueS[cIdx].flows.push_back(flowIdx);
+                    
+                    std::vector <uint32_t> link;
+                    link.push_back(m_flowsPath[flowIdx][i]);
+                    link.push_back(m_flowsPath[flowIdx][i+1]);
+                    cliqueS[cIdx].flowSegs.push_back(link);
+                    
+                    cliqueS[cIdx].phyRate.push_back(0);
+                    cliqueS[cIdx].timeAlloc.push_back(0);//Initiate time for each flow segment.
+                }
+            }
+        }
+    }*/
+
+    
+
 }
 
 	uint32_t
@@ -581,20 +733,10 @@ DmgAlmightyController::ConfigureSchedule (void)
 {
 	NS_LOG_FUNCTION(this);
     
-    NS_LOG_DEBUG("m_intfStas " << m_intfStas.size());
-    
-    for (uint32_t intfSet = 0; intfSet < m_intfStas.size(); intfSet ++){
-        NS_LOG_DEBUG("intfSet "<< intfSet<< "have..");
-        for (uint32_t id_sta = 0; id_sta < m_intfStas[intfSet].size(); id_sta ++){
-                NS_LOG_DEBUG("sta" << m_intfStas[intfSet][id_sta]);
-        }
-    }
-    
 	uint64_t overheadDurNs = (uint64_t) ceil(m_biDuration * m_biOverhaedFraction);
 	uint64_t scheduleAvailableTimeNs = (uint64_t)floor((m_biDuration - overheadDurNs)/m_numSchedulePerBi);
 	uint64_t nextSpStartNs = 0;
 
-	std::vector <uint32_t> schedulingOrder = ConfigureHierarchy();
 	std::vector <uint32_t> conflictNodes;
 
 	for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++) {
@@ -607,9 +749,9 @@ DmgAlmightyController::ConfigureSchedule (void)
 		cliqueS[cIdx].bufStaOrder.clear(); //bufSegIndexOrder?
 	}
 
-	for (uint32_t i = 0; i < schedulingOrder.size(); i++) {
+	for (uint32_t i = 0; i < m_schedulingOrder.size(); i++) {
 
-		uint32_t cIdx = schedulingOrder.at(i);
+		uint32_t cIdx = m_schedulingOrder.at(i);
 
 		uint32_t conflictNode = conflictNodes.at(cIdx);
 		nextSpStartNs = 0;
@@ -737,6 +879,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 	void
 DmgAlmightyController::ConfigureBeaconIntervals (void)
 {
+    exit(-1);
 	NS_LOG_FUNCTION(this);
 
 	// Set beacon interval duration on all nodes
@@ -1019,41 +1162,7 @@ DmgAlmightyController::ConfigureWifiManager (void)
 
 			//NS_LOG_UNCOND("sta rx power" << staRxPower);
 
-			//-----------------------measure interference for other stations
-			for (uint32_t intfLinkIdx = 0; intfLinkIdx < m_linkList.size(); intfLinkIdx++){
-				uint32_t aIntf = m_linkList[intfLinkIdx][0];
-				uint32_t bIntf = m_linkList[intfLinkIdx][1];
 
-				if (staIdx == aIntf || staIdx == bIntf || neighId == aIntf || neighId == bIntf)
-					continue;
-
-				double aRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][0]), m_meshNodes->Get(bIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
-				double bRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][1]), m_meshNodes->Get(aIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
-
-                if (m_sim_interference){
-                    if (aRxPower > -1.0e6){
-                        NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
-                        NS_LOG_UNCOND("Interference>>>>>>" << aIntf << " rx power "<< aRxPower<< " when switch to " << bIntf);
-                        std::vector <uint32_t> interfSet (4);
-                        interfSet[0] = staIdx;
-                        interfSet[1] = neighId;
-                        interfSet[2] = aIntf;
-                        interfSet[3] = bIntf;
-                        m_intfStas.push_back(interfSet);
-                    }
-                    if (bRxPower > -1.0e6){
-                        NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
-                        NS_LOG_UNCOND("Interference>>>>>>" << bIntf << " rx power "<< bRxPower<< " when switch to " << aIntf);
-                        std::vector <uint32_t> interfSet (4);
-                        interfSet[0] = staIdx;
-                        interfSet[1] = neighId;
-                        interfSet[2] = bIntf;
-                        interfSet[3] = aIntf;
-                        m_intfStas.push_back(interfSet);
-                    }
-                }
-			}
-			//////////////////////////////////////////////////////////
 
 			bool dmgOfdm = m_meshNodes->Get(staIdx)->GetDevice(0)->GetObject<WifiNetDevice>()->
 				GetPhy()->GetObject<YansWifiPhy> () ->GetDmgOfdm();
@@ -1078,6 +1187,8 @@ DmgAlmightyController::ConfigureWifiManager (void)
 		}
 	}
 }
+    
+
 
 double DmgAlmightyController::GetIdealRxPower(Ptr<Node> from, Ptr<Node> to)
 {
@@ -1325,6 +1436,10 @@ DmgAlmightyController::ConfigurePhyRate(uint32_t appPayloadBytes, double biOverh
 {
 	NS_LOG_FUNCTION(this);
 	for (uint32_t cIdx = 0; cIdx< cliqueS.size(); cIdx++){
+
+        if (m_sim_interference && (cIdx >= m_interfCliqueStart)){
+            NS_LOG_INFO("In interfeing clique "<< cIdx);
+        }
 		for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flows.size(); segIdx++){
 			uint32_t neiIdx = cliqueS[cIdx].flowSegs[segIdx][1];
 			uint32_t staIdx = cliqueS[cIdx].flowSegs[segIdx][0];
@@ -1435,6 +1550,10 @@ DmgAlmightyController::FlowRateProgressiveFilling(std::vector <double> flowsDmd,
 			NS_LOG_INFO("Flow "<< cliqueS[cIdx].flows[segIdx]<< " between " << cliqueS[cIdx].flowSegs[segIdx][0] <<" and " << cliqueS[cIdx].flowSegs[segIdx][1] <<" is allocated time "<< cliqueS[cIdx].timeAlloc[segIdx]);
 		}
 		NS_LOG_INFO("Time used in clique " << cIdx << ": " << timeSum);
+        if (m_sim_interference && (cIdx >= m_interfCliqueStart)){
+            NS_LOG_INFO("(Interfeing clique "<< cIdx<< ")");
+        }
+
 	}
 
 	for (uint32_t fIdx = 0; fIdx< flowsDmd.size(); fIdx++){

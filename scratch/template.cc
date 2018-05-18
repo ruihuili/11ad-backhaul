@@ -840,6 +840,8 @@ void SetupDmgController (struct sim_config *config)
 	config->dmgCtrl->SetFlowsPath(config->flowsPath);
 
 	config->dmgCtrl->ConfigureCliques();
+    
+    config->dmgCtrl->ConfigureHierarchy();
 
 	config->dmgCtrl->SetBeamSwitchOverhead(config->beamSwitchOverhead);
 

@@ -178,11 +178,13 @@ struct cliqueStruct
   void SetGw  (uint32_t node);
   uint32_t GetGw  (void);
 
-  std::vector <uint32_t> ConfigureHierarchy (void);
+  void ConfigureHierarchy (void);
   uint32_t GetMasterCliqueId (uint32_t node);
   uint32_t GetMasterNodeId (uint32_t node);
 
   void ConfigureAntennaAlignment (void);
+  void ConfigureInterferenceSets(void);
+    void AddInterferingCliques (void);
     
   void SetSimInterference (bool);
 
@@ -269,6 +271,8 @@ private:
 
   std::vector < std::vector <uint32_t> > m_linkList;
     
+  /*scheduling order in index of conflict nodes*/
+  std::vector <uint32_t> m_schedulingOrder;
  /*m_intfStas is a 4xN vectors
   *it records at each row the stations a, b, interf, interf_nei
   *i.g. when a Tx to b, interf will be interfered it it is receiving from interf_nei*/
@@ -298,8 +302,10 @@ private:
 
 
    std::string m_writePath;
-    
+    // if simulating interference
    bool m_sim_interference;
+    // the index of the first interference clique
+   uint32_t m_interfCliqueStart;
 
 };
 
