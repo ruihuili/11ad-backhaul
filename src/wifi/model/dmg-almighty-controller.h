@@ -268,6 +268,11 @@ private:
   std::vector < std::vector <uint32_t> > m_flowsPath;
 
   std::vector < std::vector <uint32_t> > m_linkList;
+    
+ /*m_intfStas is a 4xN vectors
+  *it records at each row the stations a, b, interf, interf_nei
+  *i.g. when a Tx to b, interf will be interfered it it is receiving from interf_nei*/
+  std::vector < std::vector <uint32_t> > m_intfStas;
   /* service period allocation
    * spAlloc.at(i) = f
    * staNode i has a fraction f of the available time in the Beacon Interval

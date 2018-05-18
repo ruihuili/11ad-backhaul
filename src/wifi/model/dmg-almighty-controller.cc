@@ -580,6 +580,16 @@ DmgAlmightyController::GetMasterNodeId (uint32_t node)
 DmgAlmightyController::ConfigureSchedule (void)
 {
 	NS_LOG_FUNCTION(this);
+    
+    NS_LOG_DEBUG("m_intfStas " << m_intfStas.size());
+    
+    for (uint32_t intfSet = 0; intfSet < m_intfStas.size(); intfSet ++){
+        NS_LOG_DEBUG("intfSet "<< intfSet<< "have..");
+        for (uint32_t id_sta = 0; id_sta < m_intfStas[intfSet].size(); id_sta ++){
+                NS_LOG_DEBUG("sta" << m_intfStas[intfSet][id_sta]);
+        }
+    }
+    
 	uint64_t overheadDurNs = (uint64_t) ceil(m_biDuration * m_biOverhaedFraction);
 	uint64_t scheduleAvailableTimeNs = (uint64_t)floor((m_biDuration - overheadDurNs)/m_numSchedulePerBi);
 	uint64_t nextSpStartNs = 0;
@@ -603,7 +613,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 
 		uint32_t conflictNode = conflictNodes.at(cIdx);
 		nextSpStartNs = 0;
-		//NS_LOG_INFO("In clique " << cIdx << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ConflictNode" << conflictNode);
+		NS_LOG_INFO("In clique " << cIdx << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ConflictNode" << conflictNode);
 
 		std::vector < std::vector < uint64_t > > bufCflSp;
 		std::vector < std::vector < uint64_t > > timeAvailable;
@@ -614,7 +624,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 			std::vector<uint32_t>::iterator it;
 			//The next hop of a cfl node is the master cfl
 			idMasterClq = GetMasterCliqueId(conflictNode);
-			//NS_LOG_INFO ( " master node "<< GetMasterNodeId(conflictNode) << " clique " <<idMasterClq );
+			NS_LOG_INFO ( " master node "<< GetMasterNodeId(conflictNode) << " clique " <<idMasterClq );
 
 			//Get the buffered sps from the Master Clique
 			for (uint32_t segIdx = 0; segIdx < cliqueS[idMasterClq].flows.size(); segIdx++){            
@@ -624,7 +634,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 						spStartStop.push_back(cliqueS[idMasterClq].bufStart[segIdx][bIdx]);
 						spStartStop.push_back(cliqueS[idMasterClq].bufStart[segIdx][bIdx]+cliqueS[idMasterClq].bufDurNs[segIdx][bIdx]);
 						bufCflSp.push_back(spStartStop); 
-						//NS_LOG_INFO("CFL has buffered SP from clique"<< idMasterClq << " from "<< bufCflSp.back().at(0) <<" to "<< bufCflSp.back().at(1));
+						NS_LOG_INFO("CFL has buffered SP from clique"<< idMasterClq << " from "<< bufCflSp.back().at(0) <<" to "<< bufCflSp.back().at(1));
 					}
 				}
 			}
@@ -672,7 +682,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 				}
 
 				uint64_t timeNeeded = segSpDurationNs;
-				//NS_LOG_INFO("Time needed "<< timeNeeded );
+				NS_LOG_INFO("Time needed "<< timeNeeded );
 				bool ifSplited = true;
 				//Firstly try to fit in any time available gap without chopping
 				for(uint32_t iRow = 0;iRow < timeAvailable.size() ;iRow++){
@@ -1020,15 +1030,28 @@ DmgAlmightyController::ConfigureWifiManager (void)
 				double aRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][0]), m_meshNodes->Get(bIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
 				double bRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][1]), m_meshNodes->Get(aIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
 
-                
-				if (aRxPower > -1.0e6){
-					NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
-					NS_LOG_UNCOND("Interference>>>>>>" << aIntf << " rx power "<< aRxPower<< " when switch to " << bIntf);
-				}
-				if (bRxPower > -1.0e6){
-					NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
-					NS_LOG_UNCOND("Interference>>>>>>" << bIntf << " rx power "<< bRxPower<< " when switch to " << aIntf);
-				}
+                if (m_sim_interference){
+                    if (aRxPower > -1.0e6){
+                        NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
+                        NS_LOG_UNCOND("Interference>>>>>>" << aIntf << " rx power "<< aRxPower<< " when switch to " << bIntf);
+                        std::vector <uint32_t> interfSet (4);
+                        interfSet[0] = staIdx;
+                        interfSet[1] = neighId;
+                        interfSet[2] = aIntf;
+                        interfSet[3] = bIntf;
+                        m_intfStas.push_back(interfSet);
+                    }
+                    if (bRxPower > -1.0e6){
+                        NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
+                        NS_LOG_UNCOND("Interference>>>>>>" << bIntf << " rx power "<< bRxPower<< " when switch to " << aIntf);
+                        std::vector <uint32_t> interfSet (4);
+                        interfSet[0] = staIdx;
+                        interfSet[1] = neighId;
+                        interfSet[2] = bIntf;
+                        interfSet[3] = aIntf;
+                        m_intfStas.push_back(interfSet);
+                    }
+                }
 			}
 			//////////////////////////////////////////////////////////
 
@@ -1395,7 +1418,7 @@ DmgAlmightyController::FlowRateProgressiveFilling(std::vector <double> flowsDmd,
 				}
 			}
 		}
-		//Re-count the number of active flows
+		//Re-compute the number of active flows
 		nActive = 0;
 		for (uint32_t fIdx = 0; fIdx< flowsDmd.size(); fIdx++){
 			if(ifActive[fIdx] == true)
