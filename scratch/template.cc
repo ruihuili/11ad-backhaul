@@ -308,6 +308,7 @@ struct sim_config {
 	double proFillStepL;
 	bool ifPrint;
 	bool ifVbr;
+    bool ifInterf;
 	std::vector <std::vector <uint64_t> > lastTxSuccess;
 	std::vector <std::vector <uint64_t> > lastTxFailure;
 	uint64_t lastRx;
@@ -832,6 +833,7 @@ void SetupDmgController (struct sim_config *config)
 	 * functions used to configure the DmgALmightyController as in this example.
 	 */
 	/* We pass the container of the mesh nodes to the DmgAlmightyController */
+    config->dmgCtrl->SetSimInterference(config->ifInterf);
 	config->dmgCtrl->SetGw(0);
 	config->dmgCtrl->SetMeshNodes(config->meshNodes);
 
@@ -1087,6 +1089,7 @@ void ConfigureBuildingBlockage (struct sim_config *config, Ptr<BuildingBlock> bu
 
 int main (int argc, char *argv[])
 {
+    LogComponentEnable("DmgSimple", LOG_LEVEL_INFO);
 	Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpNewReno::GetTypeId ()));
 	Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (1460));
 	//TcpSocket maximum transmit buffer size (bytes) default 131072(128k)
@@ -1143,6 +1146,7 @@ int main (int argc, char *argv[])
 	bool ifPrint = true;
 
 	bool ifVbr = false;
+    bool ifInterf = true;
 	/* Max # aggregated MPDU */
 	uint32_t nMpdus = 30;
 	/*By default the mac queue capacity is 5000 */
@@ -1182,6 +1186,7 @@ int main (int argc, char *argv[])
 	cmd.AddValue("refillInterval","Time interval in Nano seconds to rerun progressive filling", refillInterval);
 	cmd.AddValue("ifPrintThroughput","Print throughput in file or not", ifPrint);
 	cmd.AddValue("ifVbr","Use VBR", ifVbr);
+    cmd.AddValue("ifInterf","Simulate interference", ifInterf);
 	cmd.AddValue("numSchedulePerBi","Number of Schedules Per Beacon Interval", numSchedulePerBi);
 	cmd.AddValue("ackTraffFrac","The fraction of time used for traffic of inverse direction (e.g. tcp ack)", ackTraffFrac);
 	cmd.Parse (argc, argv);
@@ -1215,7 +1220,7 @@ int main (int argc, char *argv[])
 	config.appFileName =appFileName;
 	config.trafficType = trafficType;
 	config.macQueueSizeinPkts = macQueueSizeinPkts;
-
+    config.ifInterf = ifInterf;
 
 
 	/* File stream for throughput report.

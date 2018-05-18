@@ -58,6 +58,7 @@ DmgAlmightyController::DmgAlmightyController ()
 	m_biOverhaedFraction = 0;
 
 	m_beamSwitchOverheadNs = 0;
+    m_sim_interference = true;
 }
 
 DmgAlmightyController::~DmgAlmightyController ()
@@ -298,6 +299,13 @@ DmgAlmightyController::ConfigureWritePath (std::string w2str)
 {
         m_writePath = w2str; 
 }
+    
+void
+DmgAlmightyController::SetSimInterference (bool sim_intf)
+{
+    m_sim_interference = sim_intf;
+}
+    
 /*Read from flowsPath and build a topology knowledge of Cliques and link list 
  * that will help in configuring wifi manager and preparing for progressive filling
  */
@@ -1012,7 +1020,7 @@ DmgAlmightyController::ConfigureWifiManager (void)
 				double aRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][0]), m_meshNodes->Get(bIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
 				double bRxPower = GetInterferencePowerFromPair(m_meshNodes->Get(m_linkList[intfLinkIdx][1]), m_meshNodes->Get(aIntf), m_meshNodes->Get(staIdx), m_meshNodes->Get(neighId));
 
-                                /*
+                
 				if (aRxPower > -1.0e6){
 					NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
 					NS_LOG_UNCOND("Interference>>>>>>" << aIntf << " rx power "<< aRxPower<< " when switch to " << bIntf);
@@ -1020,7 +1028,7 @@ DmgAlmightyController::ConfigureWifiManager (void)
 				if (bRxPower > -1.0e6){
 					NS_LOG_UNCOND(staIdx << " to "<< neighId <<"(" << staRxPower<<")");
 					NS_LOG_UNCOND("Interference>>>>>>" << bIntf << " rx power "<< bRxPower<< " when switch to " << aIntf);
-				}*/
+				}
 			}
 			//////////////////////////////////////////////////////////
 
@@ -1682,21 +1690,25 @@ DmgAlmightyController::ConfigureAntennaAlignment (void)
 			Ptr<MobilityModel> aMob = m_meshNodes->Get(aSta)->GetObject<MobilityModel> ();
 			Ptr<MobilityModel> bMob = m_meshNodes->Get(bSta)->GetObject<MobilityModel> ();
 
-			if(std::find(m_neighbourNodes.at(aSta).begin(),m_neighbourNodes.at(aSta).end(),bSta) != m_neighbourNodes.at(aSta).end())
-			{
-				//NS_LOG_INFO("LOS between " << aSta << " and "<< bSta);
-				aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,true);
-				bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,true);
-
-			}
-			else
-			{
-				aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,false);
-				aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(bMob,aMob,false);
-				bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,false);
-				bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(bMob,aMob,false);
-			}
-
+            aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,true);
+            bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,true);
+          
+            if(!m_sim_interference)
+            {
+                if(std::find(m_neighbourNodes.at(aSta).begin(),m_neighbourNodes.at(aSta).end(),bSta) != m_neighbourNodes.at(aSta).end())
+                {
+                    //NS_LOG_INFO("LOS between " << aSta << " and "<< bSta);
+                    aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,true);
+                    bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,true);
+                }
+                else
+                {
+                    aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,false);
+                    aPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(bMob,aMob,false);
+                    bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(aMob,bMob,false);
+                    bPhy->GetChannel()->GetObject<YansWifiChannel>()->GetPropagationLossModel()->GetObject<FriisLoSPropagationLossModel>()->SetLoS(bMob,aMob,false);
+                }
+            }
 		}
 	}
 

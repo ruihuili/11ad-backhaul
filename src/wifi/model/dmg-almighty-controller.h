@@ -183,6 +183,8 @@ struct cliqueStruct
   uint32_t GetMasterNodeId (uint32_t node);
 
   void ConfigureAntennaAlignment (void);
+    
+  void SetSimInterference (bool);
 
   std::vector <double> FlowRateMaxDlmac(uint32_t payloadBytes, double biOverheadFraction);
 
@@ -291,6 +293,8 @@ private:
 
 
    std::string m_writePath;
+    
+   bool m_sim_interference;
 
 };
 
