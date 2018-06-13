@@ -306,6 +306,22 @@ DmgAlmightyController::SetSimInterference (bool sim_intf)
     m_sim_interference = sim_intf;
 }
     
+std::vector <uint32_t>
+DmgAlmightyController::GetSegIndicesInClique(std::vector <uint32_t> link, std::vector < std::vector < uint32_t > > flowSegs)
+{
+    uint32_t link_from = link[0];
+    uint32_t link_to = link[1];
+    
+    std::vector <uint32_t> seg_ids;
+        for (uint32_t i= 0; i < flowSegs.size(); i++){
+            if ((link_from == flowSegs[i][0] && link_to == flowSegs[i][1]) || (link_from == flowSegs[i][1] && link_to == flowSegs[i][0])){
+                seg_ids.push_back(i);
+//                NS_LOG_INFO("seg id "<< i << "from "<< link_from << "to "<< link_to << "flowSegs[i][0] "<< flowSegs[i][0] <<" flowSegs[i][1] "<< flowSegs[i][1] );
+            }
+        
+        }
+    return seg_ids;
+}
 /*Read from flowsPath and build a topology knowledge of Cliques and link list 
  * that will help in configuring wifi manager and preparing for progressive filling
  */
@@ -728,8 +744,10 @@ DmgAlmightyController::GetMasterNodeId (uint32_t node)
 	return masterId;
 }
 
+
+//called when m_sim_interference == true
 	void
-DmgAlmightyController::ConfigureSchedule (void)
+DmgAlmightyController::ConfigureScheduleWithInterfAvoidance (void)
 {
 	NS_LOG_FUNCTION(this);
     
@@ -739,6 +757,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 
 	std::vector <uint32_t> conflictNodes;
 
+    //Do sth with the cIdx >= m_interfCliqueStart
 	for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++) {
 		conflictNodes.push_back(cliqueS[cIdx].staMem.back());
 
@@ -758,7 +777,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 		NS_LOG_INFO("In clique " << cIdx << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ConflictNode" << conflictNode);
 
 		std::vector < std::vector < uint64_t > > bufCflSp;
-		std::vector < std::vector < uint64_t > > timeAvailable;
+		std::vector < std::vector < uint64_t > > timeAvailableInClique; //Time available for the clique
 
 		uint32_t idMasterClq;//The id of master clique
 
@@ -771,30 +790,114 @@ DmgAlmightyController::ConfigureSchedule (void)
 			//Get the buffered sps from the Master Clique
 			for (uint32_t segIdx = 0; segIdx < cliqueS[idMasterClq].flows.size(); segIdx++){            
 				if ((conflictNode == cliqueS[idMasterClq].flowSegs[segIdx][0])||(conflictNode == cliqueS[idMasterClq].flowSegs[segIdx][1])){
-					for (uint32_t bIdx = 0; bIdx < cliqueS[idMasterClq].bufStart[segIdx].size(); bIdx++) {
+
+                    for (uint32_t bIdx = 0; bIdx < cliqueS[idMasterClq].bufStart[segIdx].size(); bIdx++) {
 						std::vector <uint64_t> spStartStop;
 						spStartStop.push_back(cliqueS[idMasterClq].bufStart[segIdx][bIdx]);
 						spStartStop.push_back(cliqueS[idMasterClq].bufStart[segIdx][bIdx]+cliqueS[idMasterClq].bufDurNs[segIdx][bIdx]);
 						bufCflSp.push_back(spStartStop); 
-						NS_LOG_INFO("CFL has buffered SP from clique"<< idMasterClq << " from "<< bufCflSp.back().at(0) <<" to "<< bufCflSp.back().at(1));
+						NS_LOG_INFO("CFL has buffered SP from clique"<< idMasterClq << " from "<< bufCflSp.back().at(0) <<" to "<< bufCflSp.back().at(1) << " seg "<< segIdx);
 					}
 				}
 			}
 
 			//Get the available time slot to aid the shuffling
-			timeAvailable.resize(bufCflSp.size() + 1);
-			timeAvailable.front().push_back(0);
+			timeAvailableInClique.resize(bufCflSp.size() + 1);
+			timeAvailableInClique.front().push_back(0);
 			for (uint32_t iRow = 0; iRow < bufCflSp.size(); iRow++){
-				timeAvailable.at(iRow).push_back(bufCflSp.at(iRow).at(0));
-				timeAvailable.at(iRow+1).push_back(bufCflSp.at(iRow).at(1));
+				timeAvailableInClique.at(iRow).push_back(bufCflSp.at(iRow).at(0));
+				timeAvailableInClique.at(iRow+1).push_back(bufCflSp.at(iRow).at(1));
 			}
-			timeAvailable.back().push_back(scheduleAvailableTimeNs);
+			timeAvailableInClique.back().push_back(scheduleAvailableTimeNs);
 		}
+        
+        for (uint32_t slot = 0; slot < timeAvailableInClique.size(); slot++)
+        {
+            NS_LOG_INFO("timeAvailableInClique from " << timeAvailableInClique[slot][0] << " to " << timeAvailableInClique[slot][1]);
+        }
 
 		//Slicing and buffering on STAs
 		for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flowSegs.size(); segIdx++) {
 			NS_LOG_INFO("Flow "<< cliqueS[cIdx].flows[segIdx] << " segment between "<<cliqueS[cIdx].flowSegs[segIdx][0] <<" and "<< cliqueS[cIdx].flowSegs[segIdx][1]);
+            
+            //avoiding interfering links to be active concurrently
+            std::vector < std::vector < uint64_t > > timeAvailable = timeAvailableInClique;
 
+            std::vector < std:: vector <uint64_t> > timeAvoid;
+            // in interfering cliques
+            for (uint32_t cItf = m_interfCliqueStart; cItf < cliqueS.size(); cItf++)
+            {
+                std::vector <uint32_t> segIdInClq;
+                segIdInClq = GetSegIndicesInClique(cliqueS[cIdx].flowSegs[segIdx], cliqueS[cItf].flowSegs);
+                if(segIdInClq.empty()){
+                    continue;
+                }
+                //NS_LOG_INFO("interf clq"<< cItf);
+                //taking care of cliqueS[cIdx].flowSegs[segIdx]
+                //check if the other link in interfering clique have buffered times
+                //if yes, buf this for cliqueS[cIdx].flowSegs[segIdx] to avoid later
+
+                //check all the other segs in this interf clique
+                for(uint32_t otherSeg = 0; otherSeg < cliqueS[cItf].flowSegs.size(); otherSeg++)
+                {
+                    if (std::find(segIdInClq.begin(),segIdInClq.end(), otherSeg) != segIdInClq.end()){
+                        //skip the segs in segIdInClq
+                        continue;
+                    }
+                    
+                    std::vector <uint32_t> seg_to_avoid = cliqueS[cItf].flowSegs[otherSeg];
+                    //find in classic cliques where these links belong to
+                    for (uint32_t cClassic = 0; cClassic < m_interfCliqueStart; cClassic++)
+                    {
+                        std::vector <uint32_t> seg_avoid_in_classic;
+                        
+                        seg_avoid_in_classic = GetSegIndicesInClique(seg_to_avoid, cliqueS[cClassic].flowSegs);
+
+                        if(seg_avoid_in_classic.empty()){
+                            continue;
+                        }
+                       
+                        //check if they have buffered SPs
+                        for(uint32_t iter = 0; iter< seg_avoid_in_classic.size(); iter++){
+                            //if buffered size is greater than 0
+                            uint32_t seg = seg_avoid_in_classic[iter];
+                          
+                            if(cliqueS[cClassic].bufStart[seg].size()){
+                                //NS_LOG_INFO("buf size"<< cliqueS[cClassic].bufStart[seg].size());
+                                for(uint32_t buf_id = 0; buf_id< cliqueS[cClassic].bufStart[seg].size(); buf_id++){
+                                    std::vector <uint64_t> avoidStartStop;
+                                    avoidStartStop.push_back(cliqueS[cClassic].bufStart[seg][buf_id]);
+                                    avoidStartStop.push_back(cliqueS[cClassic].bufStart[seg][buf_id] + cliqueS[cClassic].bufDurNs[seg][buf_id]);
+                                    timeAvoid.push_back(avoidStartStop);
+                                    
+                                    //Print info for debugging
+                                    //NS_LOG_INFO("...should avoid "<< cliqueS[cClassic].bufStart[seg][buf_id] <<" and "<< cliqueS[cClassic].bufStart[seg][buf_id] + cliqueS[cClassic].bufDurNs[seg][buf_id] << " (used by "<< seg_to_avoid[0] <<" and "<< seg_to_avoid[1] << " flow "<< cliqueS[cClassic].flows[seg] << " in clique " << cClassic <<")" );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            for(uint32_t i=0; i< timeAvoid.size(); i++)
+            {
+                for(uint32_t j=0; j<i; j++)
+                {
+                    if(timeAvoid[i][0] == timeAvoid[j][0] && timeAvoid[i][1] == timeAvoid[j][1])
+                    {
+                        timeAvoid.erase(timeAvoid.begin() + i);
+                        i--;
+                    }
+                }
+            }
+            for(uint32_t i=0; i< timeAvoid.size(); i++)
+                NS_LOG_INFO("To AVOID " << timeAvoid[i][0] << " "<< timeAvoid[i][1] <<" for interf");
+
+            
+            timeAvailable = RemoveIntervalFromTimeAvailable(timeAvoid, timeAvailable);
+            
+           
+            //the actual scheduling
 			uint64_t segSpDurationNs = (uint64_t) floor (scheduleAvailableTimeNs * cliqueS[cIdx].timeAlloc[segIdx]);
 			bool segAllocated = 0;
 
@@ -824,15 +927,25 @@ DmgAlmightyController::ConfigureSchedule (void)
 				}
 
 				uint64_t timeNeeded = segSpDurationNs;
-				NS_LOG_INFO("Time needed "<< timeNeeded );
+				NS_LOG_INFO("Time needed " << timeNeeded);
 				bool ifSplited = true;
 				//Firstly try to fit in any time available gap without chopping
 				for(uint32_t iRow = 0;iRow < timeAvailable.size() ;iRow++){
-					if (segSpDurationNs <= timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0)){
+					if (segSpDurationNs <= timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0))
+                    {
 						cliqueS[cIdx].bufStart[segIdx].push_back(timeAvailable.at(iRow).at(0));
 						cliqueS[cIdx].bufDurNs[segIdx].push_back(segSpDurationNs);// buffer sp on sta
-						//NS_LOG_INFO("SP fitted in between " << cliqueS[cIdx].bufStart[segIdx].back() << " and " << cliqueS[cIdx].bufDurNs[segIdx].back()+cliqueS[cIdx].bufStart[segIdx].back());
+						NS_LOG_INFO("SP fitted in between " << cliqueS[cIdx].bufStart[segIdx].back() << " and " << cliqueS[cIdx].bufDurNs[segIdx].back()+cliqueS[cIdx].bufStart[segIdx].back());
 						timeAvailable.at(iRow).at(0) +=segSpDurationNs;
+                        
+                        //modify timeAvailableInClique
+                        std::vector< std::vector< uint64_t> > timeTaken;
+                        std::vector< uint64_t> fromTo;
+                        fromTo.push_back(cliqueS[cIdx].bufStart[segIdx].back());//from
+                        fromTo.push_back(cliqueS[cIdx].bufDurNs[segIdx].back()+cliqueS[cIdx].bufStart[segIdx].back());//to
+                        timeTaken.push_back(fromTo);
+                        timeAvailableInClique = RemoveIntervalFromTimeAvailable(timeTaken, timeAvailableInClique);
+                        
 						ifSplited = false;
 						timeNeeded = 0;
 						break;
@@ -845,23 +958,42 @@ DmgAlmightyController::ConfigureSchedule (void)
 							continue;
 
 						if (timeNeeded >= timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0)){
-							//NS_LOG_INFO(" sp cannot fitted in between " << timeAvailable.at(iRow).at(0) << " and " << timeAvailable.at(iRow).at(1) << "(slicing)");
+							NS_LOG_INFO(" sp cannot fitted in between " << timeAvailable.at(iRow).at(0) << " and " << timeAvailable.at(iRow).at(1) << "(slicing)");
 							cliqueS[cIdx].bufStart[segIdx].push_back(timeAvailable.at(iRow).at(0));
 							cliqueS[cIdx].bufDurNs[segIdx].push_back(timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0));
 							timeAvailable.at(iRow).at(0) = timeAvailable.at(iRow).at(1);
+                            
+                            //modify timeAvailableInClique
+                            std::vector< std::vector< uint64_t> > timeTaken;
+                            std::vector< uint64_t> fromTo;
+                            fromTo.push_back(cliqueS[cIdx].bufStart[segIdx].back());//from
+                            fromTo.push_back(cliqueS[cIdx].bufDurNs[segIdx].back() + cliqueS[cIdx].bufStart[segIdx].back());//to
+                            timeTaken.push_back(fromTo);
+                            timeAvailableInClique = RemoveIntervalFromTimeAvailable(timeTaken, timeAvailableInClique);
+                            
 							timeNeeded = timeNeeded - cliqueS[cIdx].bufDurNs[segIdx].back();
-							//NS_LOG_INFO(" more time needed " << timeNeeded);
+							NS_LOG_INFO(" more time needed " << timeNeeded);
 						}
 						else if (timeNeeded < timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0)){
-							//NS_LOG_INFO(" sp fitted in between " << timeAvailable.at(iRow).at(0) << " and " << timeAvailable.at(iRow).at(0) + timeNeeded << "(stop slicing)");
+							NS_LOG_INFO(" sp fitted in between " << timeAvailable.at(iRow).at(0) << " and " << timeAvailable.at(iRow).at(0) + timeNeeded << "(stop slicing)");
 							cliqueS[cIdx].bufStart[segIdx].push_back(timeAvailable.at(iRow).at(0));
 							cliqueS[cIdx].bufDurNs[segIdx].push_back(timeNeeded);
 							timeAvailable.at(iRow).at(0) += timeNeeded;
+                            
+                            //modify timeAvailableInClique
+                            std::vector< std::vector< uint64_t> > timeTaken;
+                            std::vector< uint64_t> fromTo;
+                            fromTo.push_back(cliqueS[cIdx].bufStart[segIdx].back());//from
+                            fromTo.push_back(cliqueS[cIdx].bufDurNs[segIdx].back() + cliqueS[cIdx].bufStart[segIdx].back());//to
+                            timeTaken.push_back(fromTo);
+                            timeAvailableInClique = RemoveIntervalFromTimeAvailable(timeTaken, timeAvailableInClique);
+                            
 							timeNeeded = 0;
 						}
 					}
 				}
-				if (timeNeeded){
+
+                if (timeNeeded){
 					if (timeNeeded<=10){
 						timeNeeded = 0;
 						//NS_LOG_INFO(" time in clique overflowing but for small amount (<=10ns)");
@@ -876,10 +1008,222 @@ DmgAlmightyController::ConfigureSchedule (void)
 	}
 }
 
+    //utility function to remove 'toRemove' from 'avaiTime'
+std::vector < std::vector <uint64_t> >
+DmgAlmightyController:: RemoveIntervalFromTimeAvailable (std::vector < std::vector <uint64_t> > toRemove, std::vector < std::vector <uint64_t> > avaiTime)
+{
+    for(uint32_t i=0; i< toRemove.size(); i++)
+    {
+        uint64_t avoidStart = toRemove[i][0];
+        uint64_t avoidStop = toRemove[i][1];
+        for (uint32_t slot = 0; slot < avaiTime.size(); slot++)
+        {
+//            NS_LOG_INFO("avaiTime from " << avaiTime[slot][0] << " to " << avaiTime[slot][1] << " avoid start "<< avoidStart << " avoid stop " << avoidStop);
+            
+            if(avoidStart <= avaiTime[slot][0] && avoidStop >= avaiTime[slot][0] && avoidStop <= avaiTime[slot][1])
+            {
+                avaiTime[slot][0] = avoidStop;
+//                NS_LOG_INFO("shortening slot from front " << avaiTime[slot][0] << " to " << avaiTime[slot][1]);
+            }
+            else if(avoidStart >= avaiTime[slot][0] && avoidStart <= avaiTime[slot][1] && avoidStop >= avaiTime[slot][1])
+            {
+                avaiTime[slot][1] = avoidStart;
+//                NS_LOG_INFO("shortening slot from back " << avaiTime[slot][0] << " to " << avaiTime[slot][1]);
+            }
+            else if(avoidStart > avaiTime[slot][0] && avoidStart < avaiTime[slot][1] && avoidStop > avaiTime[slot][0] && avoidStop < avaiTime[slot][1])
+            {
+//                NS_LOG_INFO("inserting new row ");
+//                for(uint32_t i=0; i< avaiTime.size(); i++)
+//                    NS_LOG_INFO(" before TimeAvai" << avaiTime[i][0] << " "<< avaiTime[i][1] <<" for interf");
+//
+                std::vector <uint64_t> newRow;
+                newRow.push_back(avoidStop);
+                newRow.push_back(avaiTime[slot][1]);
+                
+                avaiTime[slot][1] = avoidStart;
+                
+//                NS_LOG_INFO(" vec increasing?" << avaiTime.size());
+                
+                std::vector< std::vector<uint64_t > >::iterator it;
+                
+                it = avaiTime.begin() + slot + 1;
+                it = avaiTime.insert (it , newRow); //slot++ or not?
+                
+//                NS_LOG_INFO(" vec increasing" << avaiTime.size());
+//                for(uint32_t i=0; i< avaiTime.size(); i++)
+//                        NS_LOG_INFO("TimeAvai " << avaiTime[i][0] << " "<< avaiTime[i][1] <<" for interf");
+            }
+            else
+            {
+                //NS_LOG_INFO("not changing avaiTime");
+            }
+        }
+        
+    }
+
+    return avaiTime;
+}
+    
+    // When m_sim_interf == false
+void
+DmgAlmightyController::ConfigureSchedule (void)
+{
+    NS_LOG_FUNCTION(this);
+    
+    uint64_t overheadDurNs = (uint64_t) ceil(m_biDuration * m_biOverhaedFraction);
+    uint64_t scheduleAvailableTimeNs = (uint64_t)floor((m_biDuration - overheadDurNs)/m_numSchedulePerBi);
+    uint64_t nextSpStartNs = 0;
+    
+    std::vector <uint32_t> conflictNodes;
+    
+    //Do sth with the cIdx >= m_interfCliqueStart
+    for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++) {
+        conflictNodes.push_back(cliqueS[cIdx].staMem.back());
+        
+        cliqueS[cIdx].bufStart.clear();
+        cliqueS[cIdx].bufStart.resize(cliqueS[cIdx].flowSegs.size());
+        cliqueS[cIdx].bufDurNs.clear();
+        cliqueS[cIdx].bufDurNs.resize(cliqueS[cIdx].flowSegs.size());
+        cliqueS[cIdx].bufStaOrder.clear(); //bufSegIndexOrder?
+    }
+    
+    for (uint32_t i = 0; i < m_schedulingOrder.size(); i++) {
+        
+        uint32_t cIdx = m_schedulingOrder.at(i);
+        
+        uint32_t conflictNode = conflictNodes.at(cIdx);
+        nextSpStartNs = 0;
+        NS_LOG_INFO("In clique " << cIdx << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ConflictNode" << conflictNode);
+        
+        std::vector < std::vector < uint64_t > > bufCflSp;
+        std::vector < std::vector < uint64_t > > timeAvailable; //Time available for the clique
+        
+        uint32_t idMasterClq;//The id of master clique
+        
+        if (conflictNode != conflictNodes.front()){
+            std::vector<uint32_t>::iterator it;
+            //The next hop of a cfl node is the master cfl
+            idMasterClq = GetMasterCliqueId(conflictNode);
+            NS_LOG_INFO ( " master node "<< GetMasterNodeId(conflictNode) << " clique " <<idMasterClq );
+            
+            //Get the buffered sps from the Master Clique
+            for (uint32_t segIdx = 0; segIdx < cliqueS[idMasterClq].flows.size(); segIdx++){
+                if ((conflictNode == cliqueS[idMasterClq].flowSegs[segIdx][0])||(conflictNode == cliqueS[idMasterClq].flowSegs[segIdx][1])){
+                    for (uint32_t bIdx = 0; bIdx < cliqueS[idMasterClq].bufStart[segIdx].size(); bIdx++) {
+                        std::vector <uint64_t> spStartStop;
+                        spStartStop.push_back(cliqueS[idMasterClq].bufStart[segIdx][bIdx]);
+                        spStartStop.push_back(cliqueS[idMasterClq].bufStart[segIdx][bIdx]+cliqueS[idMasterClq].bufDurNs[segIdx][bIdx]);
+                        bufCflSp.push_back(spStartStop);
+                        NS_LOG_INFO("CFL has buffered SP from clique"<< idMasterClq << " from "<< bufCflSp.back().at(0) <<" to "<< bufCflSp.back().at(1));
+                    }
+                }
+            }
+            
+            //Get the available time slot to aid the shuffling
+            timeAvailable.resize(bufCflSp.size() + 1);
+            timeAvailable.front().push_back(0);
+            
+            for (uint32_t iRow = 0; iRow < bufCflSp.size(); iRow++){
+                timeAvailable.at(iRow).push_back(bufCflSp.at(iRow).at(0));
+                timeAvailable.at(iRow+1).push_back(bufCflSp.at(iRow).at(1));
+            }
+            timeAvailable.back().push_back(scheduleAvailableTimeNs);
+        }
+        
+        //Slicing and buffering on STAs
+        for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flowSegs.size(); segIdx++) {
+            NS_LOG_INFO("Flow "<< cliqueS[cIdx].flows[segIdx] << " segment between "<<cliqueS[cIdx].flowSegs[segIdx][0] <<" and "<< cliqueS[cIdx].flowSegs[segIdx][1]);
+            
+//            for (uint32_t slot = 0; slot < timeAvailable.size(); slot++)
+//            {
+//                NS_LOG_INFO("timeAvailable from " << timeAvailable[slot][0] << " to " << timeAvailable[slot][1]);
+//            }
+            
+            uint64_t segSpDurationNs = (uint64_t) floor (scheduleAvailableTimeNs * cliqueS[cIdx].timeAlloc[segIdx]);
+            bool segAllocated = 0;
+            
+            if (conflictNode == conflictNodes.front()) {
+                
+                cliqueS[cIdx].bufStart[segIdx].push_back(nextSpStartNs);
+                cliqueS[cIdx].bufDurNs[segIdx].push_back(segSpDurationNs);// buffer sp on sta
+                NS_LOG_INFO(" buffering time between "<< cliqueS[cIdx].bufStart[segIdx].back() <<" and "<< cliqueS[cIdx].bufStart[segIdx].back() + cliqueS[cIdx].bufDurNs[segIdx].back());
+                nextSpStartNs += segSpDurationNs;
+            }
+            else{
+                for (uint32_t segIdMaster = 0; segIdMaster < cliqueS[idMasterClq].bufStart.size(); segIdMaster++)
+                {
+                    if((cliqueS[cIdx].flowSegs[segIdx][0] == cliqueS[idMasterClq].flowSegs[segIdMaster][0]) && (cliqueS[cIdx].flowSegs[segIdx][1] == cliqueS[idMasterClq].flowSegs[segIdMaster][1]) && (cliqueS[cIdx].flows[segIdx] == cliqueS[idMasterClq].flows[segIdMaster])){
+                        
+                        for (uint32_t bIdx = 0; bIdx < cliqueS[idMasterClq].bufStart[segIdMaster].size(); bIdx++){
+                            cliqueS[cIdx].bufStart[segIdx].push_back(cliqueS[idMasterClq].bufStart[segIdMaster][bIdx]);
+                            cliqueS[cIdx].bufDurNs[segIdx].push_back(cliqueS[idMasterClq].bufDurNs[segIdMaster][bIdx]);
+                            
+                        }
+                        //NS_LOG_INFO("Skipping because this flow seg has been allocated SP " );
+                        segAllocated = 1;
+                    }
+                }
+                if(segAllocated == 1){
+                    continue;
+                }
+                
+                uint64_t timeNeeded = segSpDurationNs;
+                NS_LOG_INFO("Time needed "<< timeNeeded );
+                bool ifSplited = true;
+                //Firstly try to fit in any time available gap without chopping
+                for(uint32_t iRow = 0;iRow < timeAvailable.size() ;iRow++){
+                    if (segSpDurationNs <= timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0)){
+                        cliqueS[cIdx].bufStart[segIdx].push_back(timeAvailable.at(iRow).at(0));
+                        cliqueS[cIdx].bufDurNs[segIdx].push_back(segSpDurationNs);// buffer sp on sta
+                        NS_LOG_INFO("SP fitted in between " << cliqueS[cIdx].bufStart[segIdx].back() << " and " << cliqueS[cIdx].bufDurNs[segIdx].back()+cliqueS[cIdx].bufStart[segIdx].back());
+                        timeAvailable.at(iRow).at(0) +=segSpDurationNs;
+                        ifSplited = false;
+                        timeNeeded = 0;
+                        break;
+                    }
+                }
+                //If cannot fit in any gaps, fill the gaps sequentially from the 1st gap until all timeNeeded has been fitted
+                if(ifSplited){
+                    for(uint32_t iRow = 0;iRow < timeAvailable.size() ;iRow++){
+                        if (timeAvailable.at(iRow).at(1) == timeAvailable.at(iRow).at(0))
+                            continue;
+                        
+                        if (timeNeeded >= timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0)){
+                            NS_LOG_INFO(" sp cannot fitted in between " << timeAvailable.at(iRow).at(0) << " and " << timeAvailable.at(iRow).at(1) << "(slicing)");
+                            cliqueS[cIdx].bufStart[segIdx].push_back(timeAvailable.at(iRow).at(0));
+                            cliqueS[cIdx].bufDurNs[segIdx].push_back(timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0));
+                            timeAvailable.at(iRow).at(0) = timeAvailable.at(iRow).at(1);
+                            timeNeeded = timeNeeded - cliqueS[cIdx].bufDurNs[segIdx].back();
+                            NS_LOG_INFO(" more time needed " << timeNeeded);
+                        }
+                        else if (timeNeeded < timeAvailable.at(iRow).at(1) - timeAvailable.at(iRow).at(0)){
+                            NS_LOG_INFO(" sp fitted in between " << timeAvailable.at(iRow).at(0) << " and " << timeAvailable.at(iRow).at(0) + timeNeeded << "(stop slicing)");
+                            cliqueS[cIdx].bufStart[segIdx].push_back(timeAvailable.at(iRow).at(0));
+                            cliqueS[cIdx].bufDurNs[segIdx].push_back(timeNeeded);
+                            timeAvailable.at(iRow).at(0) += timeNeeded;
+                            timeNeeded = 0;
+                        }
+                    }
+                }
+                if (timeNeeded){
+                    if (timeNeeded<=10){
+                        timeNeeded = 0;
+                        //NS_LOG_INFO(" time in clique overflowing but for small amount (<=10ns)");
+                    }
+                    else{
+                        NS_LOG_WARN(" WARNING: time in clique" << cIdx << "overflowing");
+                        exit(-1);
+                    }
+                }
+            }
+        }
+    }
+}
+
 	void
 DmgAlmightyController::ConfigureBeaconIntervals (void)
 {
-    exit(-1);
+    //exit(-1);
 	NS_LOG_FUNCTION(this);
 
 	// Set beacon interval duration on all nodes
@@ -979,26 +1323,27 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 					continue;
 				}
 				else{
-                                        //if(scheIdx ==0)
+                    //if(scheIdx ==0)
 					//the sta is not cfl
-					//NS_LOG_INFO("STA " << staIdx << " isn't a Cfl");
+					NS_LOG_INFO("STA " << staIdx << " isn't a Cfl");
 
 					std::vector <uint32_t> segIdOrder;
 					std::vector <uint32_t> bufIdOrder;
 					std::vector <uint64_t> refStartTime;
 					for (uint32_t segIdx = 0; segIdx < cliqueS[cIdx].flowSegs.size(); segIdx++){
 						if ((cliqueS[cIdx].flowSegs[segIdx][0] == staIdx)||(cliqueS[cIdx].flowSegs[segIdx][1] == staIdx)){
-							//NS_LOG_INFO("STA " << staIdx << "is in seg "<< segIdx );
+							NS_LOG_INFO("STA " << staIdx << "is in seg "<< segIdx << " buffer size" <<cliqueS[cIdx].bufStart[segIdx].size());
 							for (uint32_t bIdx = 0; bIdx < cliqueS[cIdx].bufStart[segIdx].size(); bIdx++){
-								//NS_LOG_INFO("   the " << bIdx << " buffer is noted." );
+								NS_LOG_INFO("   the " << bIdx << " buffer is noted." );
 								segIdOrder.push_back(segIdx);
 								bufIdOrder.push_back(bIdx);
 								refStartTime.push_back(cliqueS[cIdx].bufStart[segIdx][bIdx]);
 							}
 						}
 					}
-					//NS_LOG_INFO(" refStartTime.size() "<< refStartTime.size());
-					//exit(-1);
+                    //NS_LOG_INFO(" "<< cliqueS[cIdx].bufStart[1][bIdx]);
+                    NS_LOG_INFO(" refStartTime.size() "<< refStartTime.size());
+                    //exit(-1);
 					for (uint32_t segIdx = 0; segIdx < refStartTime.size() - 1; segIdx++){
 						NS_LOG_INFO(" sorting in seg "<< segIdx);
 						for (uint32_t sortingIdx = segIdx + 1; sortingIdx < refStartTime.size(); sortingIdx++) {

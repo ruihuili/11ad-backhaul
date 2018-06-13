@@ -126,6 +126,7 @@ struct cliqueStruct
 
   /*Configure a single scheudel and buffer all sps in the structure conlictS */
   void ConfigureSchedule (void);
+  void ConfigureScheduleWithInterfAvoidance (void);
   
   /* Configure a DmgBeaconInterval for each node of the network with the schedule.
    * A DmgBeaconInterval holds a list of DmgServicePeriod 
@@ -189,6 +190,12 @@ struct cliqueStruct
   void SetSimInterference (bool);
 
   std::vector <double> FlowRateMaxDlmac(uint32_t payloadBytes, double biOverheadFraction);
+    
+
+  std::vector <uint32_t> GetSegIndicesInClique(std::vector <uint32_t>,std::vector < std::vector < uint32_t > > flowSegs);
+    
+  std::vector < std::vector <uint64_t> > RemoveIntervalFromTimeAvailable (std::vector < std::vector <uint64_t> >, std::vector < std::vector <uint64_t> >);
+
 
 private:
 

@@ -808,7 +808,14 @@ void ReconfigureDmgBeaconInterval (struct sim_config *config, uint16_t it)
 
 	config->predictedFlowRate = config->dmgCtrl->FlowRateProgressiveFilling(config->flowsDmd, config->proFillStepL, config->appPayloadBytes, config->biOverheadFraction, config->nMpdus);
 
-	config->dmgCtrl->ConfigureSchedule();
+    if(config->ifInterf)
+    {
+        config->dmgCtrl->ConfigureScheduleWithInterfAvoidance();
+    }
+    else
+    {
+        config->dmgCtrl->ConfigureSchedule();
+    }
 
 	config->dmgCtrl->ConfigureBeaconIntervals();
 
@@ -875,7 +882,14 @@ void SetupDmgController (struct sim_config *config)
 	/* Configure the DmgBeaconInterval on each node with the list of Secrive
 	 * Periods.
 	 */
-	config->dmgCtrl->ConfigureSchedule();
+    if(config->ifInterf)
+    {
+        config->dmgCtrl->ConfigureScheduleWithInterfAvoidance();
+    }
+    else
+    {
+        config->dmgCtrl->ConfigureSchedule();
+    }
 
 	config->dmgCtrl->ConfigureBeaconIntervals();
 
