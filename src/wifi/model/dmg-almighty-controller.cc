@@ -1221,7 +1221,7 @@ DmgAlmightyController::ConfigureSchedule (void)
 }
 
 	void
-DmgAlmightyController::ConfigureBeaconIntervals (void)
+DmgAlmightyController:: ConfigureBeaconIntervals (void)
 {
     //exit(-1);
 	NS_LOG_FUNCTION(this);
@@ -1251,6 +1251,9 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 	for (uint32_t scheIdx=0; scheIdx < m_numSchedulePerBi; scheIdx++){
                 if(scheIdx ==0)
 		NS_LOG_INFO("<<<<<<<<<< Example schedule >>> Starts at "<< scheduleStartNs <<" Ends at "<< scheduleStartNs + scheduleDurNs<<" >>>>>>>>>>>>>>>>>>>>>>");
+                else
+		NS_LOG_INFO("<<<<<<<<<< schedule >>> Starts at "<< scheduleStartNs <<" Ends at "<< scheduleStartNs + scheduleDurNs<<" >>>>>>>>>>>>>>>>>>>>>>");
+
 		for (uint32_t cIdx = 0; cIdx < cliqueS.size(); cIdx++){
 			uint32_t conflictNode = conflictNodes.at(cIdx);
                         if(scheIdx ==0)
@@ -1274,15 +1277,17 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
 						}
 					}
 
-					for (uint32_t segIdx = 0; segIdx < refStartTime.size() - 1; segIdx++){
-						for (uint32_t sortingIdx = segIdx + 1; sortingIdx < refStartTime.size(); sortingIdx++) {
-							if (refStartTime[segIdx] > refStartTime[sortingIdx]) {
-								std::swap(segIdOrder.at(sortingIdx), segIdOrder.at(segIdx));
-								std::swap(bufIdOrder.at(sortingIdx), bufIdOrder.at(segIdx));
-								std::swap(refStartTime.at(sortingIdx), refStartTime.at(segIdx));
-							}
-						}
-					}
+                                        if (refStartTime.size() > 1){
+					        for (uint32_t segIdx = 0; segIdx < refStartTime.size() - 1; segIdx++){
+						        for (uint32_t sortingIdx = segIdx + 1; sortingIdx < refStartTime.size(); sortingIdx++) {
+							        if (refStartTime[segIdx] > refStartTime[sortingIdx]) {
+								        std::swap(segIdOrder.at(sortingIdx), segIdOrder.at(segIdx));
+								        std::swap(bufIdOrder.at(sortingIdx), bufIdOrder.at(segIdx));
+								        std::swap(refStartTime.at(sortingIdx), refStartTime.at(segIdx));
+							        }
+						        }
+					        }
+                                        }
 					for (uint32_t i = 0; i < refStartTime.size(); i++){
 						uint32_t segId = segIdOrder[i];
 						uint32_t bufId = bufIdOrder[i];
@@ -1344,16 +1349,18 @@ DmgAlmightyController::ConfigureBeaconIntervals (void)
                     //NS_LOG_INFO(" "<< cliqueS[cIdx].bufStart[1][bIdx]);
                     NS_LOG_INFO(" refStartTime.size() "<< refStartTime.size());
                     //exit(-1);
-					for (uint32_t segIdx = 0; segIdx < refStartTime.size() - 1; segIdx++){
-						NS_LOG_INFO(" sorting in seg "<< segIdx);
-						for (uint32_t sortingIdx = segIdx + 1; sortingIdx < refStartTime.size(); sortingIdx++) {
-							if (refStartTime[segIdx] > refStartTime[sortingIdx]) {
-								std::swap(segIdOrder.at(sortingIdx), segIdOrder.at(segIdx));
-								std::swap(bufIdOrder.at(sortingIdx), bufIdOrder.at(segIdx));
-								std::swap(refStartTime.at(sortingIdx), refStartTime.at(segIdx));
-							}
-						}
-					}
+                                        if (refStartTime.size() > 1){
+					        for (uint32_t segIdx = 0; segIdx < refStartTime.size() - 1; segIdx++){
+						        NS_LOG_INFO(" sorting in seg "<< segIdx);
+						        for (uint32_t sortingIdx = segIdx + 1; sortingIdx < refStartTime.size(); sortingIdx++) {
+							        if (refStartTime[segIdx] > refStartTime[sortingIdx]) {
+								        std::swap(segIdOrder.at(sortingIdx), segIdOrder.at(segIdx));
+								        std::swap(bufIdOrder.at(sortingIdx), bufIdOrder.at(segIdx));
+								        std::swap(refStartTime.at(sortingIdx), refStartTime.at(segIdx));
+							        }
+						        }
+					        }
+                                        }
 					for (uint32_t i = 0; i < refStartTime.size(); i++){
 						uint32_t segId = segIdOrder[i];
 						uint32_t bufId = bufIdOrder[i];
