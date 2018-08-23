@@ -517,7 +517,7 @@ void WriteTpFiles(struct sim_config *config)
 	}
 	config->dmgCtrl->PrintIdealRxPowerAndMcs();
 
-	Simulator::Schedule(Seconds(1), WriteTpFiles, config);
+	Simulator::Schedule(NanoSeconds(config->biDurationNs), WriteTpFiles, config);
 	*(config->lastReportTime) = now_t;
 }
 
